@@ -1,5 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "echo \"No npm install required for the PHP API\"",
+  "buildCommand": "echo \"No JS build required for the PHP API\"",
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.9.0",

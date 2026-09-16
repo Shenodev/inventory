@@ -1,0 +1,12 @@
+# Keep local-only secrets and build artifacts out of the Vercel upload.
+# Vercel env vars are the source of truth in production.
+.env
+.env.*
+**/.env
+**/.env.*
+backend/vendor
+backend/storage/logs
+.git
+.vercel
+.angular
+**/dist

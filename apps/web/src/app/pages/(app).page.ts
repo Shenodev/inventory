@@ -9,7 +9,7 @@ export const routeMeta: RouteMeta = {
   canActivate: [authGuard],
 };
 
-const NAV_SOON = ['Products', 'Reservations', 'Sales'];
+const NAV_SOON = ['Reservations', 'Sales'];
 
 @Component({
   selector: 'app-shell',
@@ -47,6 +47,25 @@ const NAV_SOON = ['Products', 'Reservations', 'Sales'];
               <rect x="3" y="16" width="7" height="5" rx="1.5" />
             </svg>
             Dashboard
+          </a>
+
+          <a
+            routerLink="/products"
+            routerLinkActive="bg-deep-slate text-white"
+            [routerLinkActiveOptions]="{ exact: true }"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-deep-slate hover:text-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              class="h-5 w-5"
+            >
+              <path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z" />
+              <circle cx="7.5" cy="7.5" r="1.5" />
+            </svg>
+            Products
           </a>
         </nav>
 
