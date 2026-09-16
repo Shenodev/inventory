@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "installCommand": "echo \"No npm install required for the PHP API\"",
   "buildCommand": "echo \"No JS build required for the PHP API\"",
   "functions": {
@@ -8,6 +9,13 @@
       "maxDuration": 10
     }
   },
+  "redirects": [
+    {
+      "source": "/index.php",
+      "destination": "/api/index.php",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
