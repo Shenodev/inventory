@@ -40,4 +40,29 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
+if (isset($_GET['__diag'])) {
+    header('Content-Type: application/json');
+
+    require __DIR__.'/../vendor/autoload.php';
+
+    $request = Illuminate\Http\Request::capture();
+
+    echo json_encode([
+        'ini_loaded_file' => php_ini_loaded_file(),
+        'cgi_fix_pathinfo' => ini_get('cgi.fix_pathinfo'),
+        'display_errors' => ini_get('display_errors'),
+        'log_errors' => ini_get('log_errors'),
+        'request_uri' => $_SERVER['REQUEST_URI'] ?? null,
+        'script_name' => $_SERVER['SCRIPT_NAME'] ?? null,
+        'script_filename' => $_SERVER['SCRIPT_FILENAME'] ?? null,
+        'php_self' => $_SERVER['PHP_SELF'] ?? null,
+        'path_info' => $_SERVER['PATH_INFO'] ?? null,
+        'path_translated' => $_SERVER['PATH_TRANSLATED'] ?? null,
+        'computed_baseUrl' => $request->getBaseUrl(),
+        'computed_pathInfo' => $request->getPathInfo(),
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 require __DIR__.'/../public/index.php';
+
