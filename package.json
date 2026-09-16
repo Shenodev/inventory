@@ -1,0 +1,23 @@
+{
+  "name": "sheno-inventory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ShenoInventory monorepo - Laravel 11 API (backend), Analog.js web app (apps/web), shared design system (packages/ui).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.3"
+  },
+  "packageManager": "npm@11.17.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@sheno/web",
+    "dev:web": "npm run dev --workspace=@sheno/web",
+    "build": "npm run build --workspace=@sheno/web",
+    "build:web": "npm run build --workspace=@sheno/web",
+    "test": "npm run test --workspaces --if-present",
+    "new": "npm run watch --workspace=@sheno/web"
+  }
+}

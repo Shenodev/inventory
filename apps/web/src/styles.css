@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+@import '@sheno/ui/styles.css';
+
+@config "../tailwind.config.js";
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  font-weight: 500;
+  color: #06b6d4;
+  text-decoration: inherit;
+}
+
+.analog-markdown p {
+  text-align: left;
+}
