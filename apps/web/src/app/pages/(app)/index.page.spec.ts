@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DashboardService } from '../../core/dashboard/dashboard.service';
-import DashboardPage from './dashboard.page';
+import DashboardPage from './index.page';
 
 describe('DashboardPage', () => {
   beforeEach(async () => {

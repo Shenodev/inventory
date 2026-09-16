@@ -143,7 +143,7 @@ export default class LoginPage {
     this.error.set(null);
 
     this.auth.login(credentials.email, credentials.password).subscribe({
-      next: () => void this.router.navigateByUrl('/dashboard'),
+      next: () => void this.router.navigateByUrl('/'),
       error: (error: unknown) => {
         this.submitting.set(false);
         this.error.set(this.messageFor(error));

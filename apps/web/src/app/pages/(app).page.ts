@@ -18,7 +18,7 @@ const NAV_SOON: string[] = [];
   template: `
     <div class="flex min-h-screen bg-deep-slate font-sans text-slate-300">
       <aside class="flex w-64 shrink-0 flex-col border-r border-white/5 bg-surface px-4 py-6">
-        <a routerLink="/dashboard" class="flex items-center gap-3 px-2">
+        <a routerLink="/" class="flex items-center gap-3 px-2">
           <img
             src="/favicon-96x96.png"
             alt="ShenoInventory"
@@ -29,7 +29,7 @@ const NAV_SOON: string[] = [];
 
         <nav class="mt-8 flex flex-col gap-1">
           <a
-            routerLink="/dashboard"
+            routerLink="/"
             routerLinkActive="bg-deep-slate text-white"
             [routerLinkActiveOptions]="{ exact: true }"
             class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
