@@ -32,7 +32,7 @@ const NAV_SOON: string[] = [];
             routerLink="/dashboard"
             routerLinkActive="bg-deep-slate text-white"
             [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-deep-slate hover:text-white"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
           >
             <svg
               viewBox="0 0 24 24"
@@ -53,7 +53,7 @@ const NAV_SOON: string[] = [];
             routerLink="/products"
             routerLinkActive="bg-deep-slate text-white"
             [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-deep-slate hover:text-white"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
           >
             <svg
               viewBox="0 0 24 24"
@@ -72,7 +72,7 @@ const NAV_SOON: string[] = [];
             routerLink="/sales"
             routerLinkActive="bg-deep-slate text-white"
             [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-deep-slate hover:text-white"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
           >
             <svg
               viewBox="0 0 24 24"

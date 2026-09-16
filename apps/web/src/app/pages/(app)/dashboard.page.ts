@@ -104,7 +104,7 @@ interface RecentSale {
       </article>
     </section>
 
-    <section class="mt-8 overflow-hidden rounded-xl bg-surface">
+    <section class="mt-6 overflow-hidden rounded-xl bg-surface">
       <header class="px-6 py-5">
         <h2 class="font-heading text-lg font-semibold text-white">Recent sales</h2>
         <p class="mt-1 text-sm text-slate-400">The latest sold orders and who bought them.</p>

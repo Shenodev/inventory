@@ -208,7 +208,7 @@ export default class SalesPage {
 
   protected tabClass(tab: Tab): string {
     return this.tab() === tab
-      ? 'rounded-xl bg-electric-cyan px-4 py-2 text-sm font-medium text-deep-slate'
+      ? 'rounded-xl bg-electric-cyan px-4 py-2 text-sm font-medium text-deep-slate transition-colors'
       : 'rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white';
   }
 

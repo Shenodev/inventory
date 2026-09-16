@@ -44,7 +44,7 @@ export const routeMeta: RouteMeta = {
         class="mt-6 flex items-center justify-between gap-4 rounded-xl border border-electric-cyan/30 bg-electric-cyan/10 px-5 py-4"
         role="status"
       >
-        <p class="text-sm text-cyan-100">{{ message }}</p>
+        <p class="text-sm text-slate-200">{{ message }}</p>
         <button
           type="button"
           (click)="notice.set(null)"
