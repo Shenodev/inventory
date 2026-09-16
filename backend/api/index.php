@@ -62,25 +62,5 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
-if (isset($_GET['__diag'])) {
-    header('Content-Type: application/json');
-
-    $raw = file_get_contents('php://input');
-
-    echo json_encode([
-        'method' => $_SERVER['REQUEST_METHOD'] ?? null,
-        'content_length_env' => $_SERVER['CONTENT_LENGTH'] ?? null,
-        'content_type_env' => $_SERVER['CONTENT_TYPE'] ?? null,
-        'http_content_type' => $_SERVER['HTTP_CONTENT_TYPE'] ?? null,
-        'http_content_length' => $_SERVER['HTTP_CONTENT_LENGTH'] ?? null,
-        'raw_input_len' => strlen((string) $raw),
-        'raw_input_head' => substr((string) $raw, 0, 150),
-        'post_keys' => array_keys($_POST),
-        'php_ini_loaded' => php_ini_loaded_file(),
-        'enable_post_data_reading' => ini_get('enable_post_data_reading'),
-    ], JSON_PRETTY_PRINT);
-    exit;
-}
-
 require __DIR__.'/../public/index.php';
 
