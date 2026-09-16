@@ -2,44 +2,6 @@
 
 declare(strict_types=1);
 
-if (isset($_GET['__diag'])) {
-    header('Content-Type: application/json');
-
-    require __DIR__.'/../vendor/autoload.php';
-
-    $originalUri = $_SERVER['REQUEST_URI'] ?? null;
-    $_SERVER['REQUEST_URI'] = '/api/dashboard';
-    $probe = Illuminate\Http\Request::capture();
-    $probePathInfo = $probe->getPathInfo();
-    $probeBaseUrl = $probe->getBaseUrl();
-    $_SERVER['REQUEST_URI'] = $originalUri;
-
-    $app = require __DIR__.'/../bootstrap/app.php';
-    $routes = [];
-    foreach ($app->make('router')->getRoutes() as $route) {
-        $routes[] = $route->methods()[0].' '.$route->uri();
-    }
-
-    echo json_encode([
-        'php' => PHP_VERSION,
-        'REQUEST_URI' => $originalUri,
-        'SCRIPT_NAME' => $_SERVER['SCRIPT_NAME'] ?? null,
-        'DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null,
-        'NOW_ENTRYPOINT' => $_SERVER['NOW_ENTRYPOINT'] ?? null,
-        'base_path' => $app->basePath(),
-        'probe_baseUrl' => $probeBaseUrl,
-        'probe_pathInfo' => $probePathInfo,
-        'routes_api_exists' => file_exists(__DIR__.'/../routes/api.php'),
-        'routes_api_sha1' => file_exists(__DIR__.'/../routes/api.php') ? sha1_file(__DIR__.'/../routes/api.php') : null,
-        'bootstrap_app_sha1' => sha1_file(__DIR__.'/../bootstrap/app.php'),
-        'routes_loaded' => $routes,
-        'user_dir' => array_values(array_diff(scandir(__DIR__.'/..') ?: [], ['.', '..'])),
-        'bootstrap_cache' => array_map('basename', glob(__DIR__.'/../bootstrap/cache/*.php') ?: []),
-        'tmp_cache' => array_map('basename', glob('/tmp/cache/*') ?: []),
-    ], JSON_PRETTY_PRINT);
-    exit;
-}
-
 /*
  * Vercel serverless entrypoint for the vercel-php (bref/vercel-php) runtime.
  * Every request is rewritten here by backend/vercel.json.
@@ -77,5 +39,40 @@ if (! is_dir('/tmp/cache/views')) {
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
+if (isset($_GET['__diag'])) {
+    header('Content-Type: application/json');
+
+    require __DIR__.'/../vendor/autoload.php';
+
+    $app = require __DIR__.'/../bootstrap/app.php';
+    $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+    $kernel->bootstrap();
+
+    $routes = [];
+    foreach ($app->make('router')->getRoutes() as $route) {
+        $routes[] = $route->methods()[0].' '.$route->uri();
+    }
+
+    $request = Illuminate\Http\Request::capture();
+    $response = $kernel->handle($request);
+
+    echo json_encode([
+        'request_uri' => $_SERVER['REQUEST_URI'] ?? null,
+        'script_name' => $_SERVER['SCRIPT_NAME'] ?? null,
+        'script_filename' => $_SERVER['SCRIPT_FILENAME'] ?? null,
+        'php_self' => $_SERVER['PHP_SELF'] ?? null,
+        'orig_script_name' => $_SERVER['ORIG_SCRIPT_NAME'] ?? null,
+        'path_info_env' => $_SERVER['PATH_INFO'] ?? null,
+        'document_root' => $_SERVER['DOCUMENT_ROOT'] ?? null,
+        'base_path' => $app->basePath(),
+        'computed_baseUrl' => $request->getBaseUrl(),
+        'computed_pathInfo' => $request->getPathInfo(),
+        'response_status' => $response->getStatusCode(),
+        'response_len' => strlen((string) $response->getContent()),
+        'routes_loaded' => $routes,
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
 
 require __DIR__.'/../public/index.php';
