@@ -2,6 +2,44 @@
 
 declare(strict_types=1);
 
+if (isset($_GET['__diag'])) {
+    header('Content-Type: application/json');
+
+    require __DIR__.'/../vendor/autoload.php';
+
+    $originalUri = $_SERVER['REQUEST_URI'] ?? null;
+    $_SERVER['REQUEST_URI'] = '/api/dashboard';
+    $probe = Illuminate\Http\Request::capture();
+    $probePathInfo = $probe->getPathInfo();
+    $probeBaseUrl = $probe->getBaseUrl();
+    $_SERVER['REQUEST_URI'] = $originalUri;
+
+    $app = require __DIR__.'/../bootstrap/app.php';
+    $routes = [];
+    foreach ($app->make('router')->getRoutes() as $route) {
+        $routes[] = $route->methods()[0].' '.$route->uri();
+    }
+
+    echo json_encode([
+        'php' => PHP_VERSION,
+        'REQUEST_URI' => $originalUri,
+        'SCRIPT_NAME' => $_SERVER['SCRIPT_NAME'] ?? null,
+        'DOCUMENT_ROOT' => $_SERVER['DOCUMENT_ROOT'] ?? null,
+        'NOW_ENTRYPOINT' => $_SERVER['NOW_ENTRYPOINT'] ?? null,
+        'base_path' => $app->basePath(),
+        'probe_baseUrl' => $probeBaseUrl,
+        'probe_pathInfo' => $probePathInfo,
+        'routes_api_exists' => file_exists(__DIR__.'/../routes/api.php'),
+        'routes_api_sha1' => file_exists(__DIR__.'/../routes/api.php') ? sha1_file(__DIR__.'/../routes/api.php') : null,
+        'bootstrap_app_sha1' => sha1_file(__DIR__.'/../bootstrap/app.php'),
+        'routes_loaded' => $routes,
+        'user_dir' => array_values(array_diff(scandir(__DIR__.'/..') ?: [], ['.', '..'])),
+        'bootstrap_cache' => array_map('basename', glob(__DIR__.'/../bootstrap/cache/*.php') ?: []),
+        'tmp_cache' => array_map('basename', glob('/tmp/cache/*') ?: []),
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 /*
  * Vercel serverless entrypoint for the vercel-php (bref/vercel-php) runtime.
  * Every request is rewritten here by backend/vercel.json.
