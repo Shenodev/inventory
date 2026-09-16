@@ -9,7 +9,7 @@ export const routeMeta: RouteMeta = {
   canActivate: [authGuard],
 };
 
-const NAV_SOON = ['Reservations', 'Sales'];
+const NAV_SOON: string[] = [];
 
 @Component({
   selector: 'app-shell',
@@ -67,19 +67,40 @@ const NAV_SOON = ['Reservations', 'Sales'];
             </svg>
             Products
           </a>
+
+          <a
+            routerLink="/sales"
+            routerLinkActive="bg-deep-slate text-white"
+            [routerLinkActiveOptions]="{ exact: true }"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-deep-slate hover:text-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              class="h-5 w-5"
+            >
+              <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3Z" />
+              <path d="M9 8h6M9 12h6" />
+            </svg>
+            Sales &amp; Reservations
+          </a>
         </nav>
 
-        <p class="mt-8 px-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-          Coming soon
-        </p>
-        <div class="mt-2 flex flex-col gap-1">
-          @for (item of navSoon; track item) {
-            <span class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-500">
-              <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
-              {{ item }}
-            </span>
-          }
-        </div>
+        @if (navSoon.length > 0) {
+          <p class="mt-8 px-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+            Coming soon
+          </p>
+          <div class="mt-2 flex flex-col gap-1">
+            @for (item of navSoon; track item) {
+              <span class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-500">
+                <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
+                {{ item }}
+              </span>
+            }
+          </div>
+        }
 
         <div class="mt-auto border-t border-white/5 pt-4">
           <div class="px-2">

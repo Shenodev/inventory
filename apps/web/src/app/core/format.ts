@@ -10,3 +10,8 @@ export const formatCurrency = (value: string | number): string =>
 
 export const formatNumber = (value: string | number): string =>
   numberFormatter.format(Number(value));
+
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+
+export const formatDate = (value: string | null): string =>
+  value === null ? '—' : dateTimeFormatter.format(new Date(value));
