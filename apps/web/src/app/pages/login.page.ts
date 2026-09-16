@@ -27,7 +27,7 @@ const DEMO_PASSWORD = 'password';
   imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+    <div class="flex min-h-screen items-center justify-center px-4">
       <div class="w-full max-w-sm rounded-xl bg-surface p-8 text-left">
         <div class="flex flex-col items-center gap-3 text-center">
           <img
@@ -143,7 +143,7 @@ export default class LoginPage {
     this.error.set(null);
 
     this.auth.login(credentials.email, credentials.password).subscribe({
-      next: () => void this.router.navigateByUrl('/'),
+      next: () => void this.router.navigateByUrl('/dashboard'),
       error: (error: unknown) => {
         this.submitting.set(false);
         this.error.set(this.messageFor(error));
