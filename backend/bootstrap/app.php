@@ -13,6 +13,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->throttleApi();
+
+        // This is an API-only application. Laravel defaults guests to the "login"
+        // named route, which does not exist here, so the auth middleware would
+        // blow up while building the redirect instead of returning a 401.
+        $middleware->redirectGuestsTo(fn (): ?string => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

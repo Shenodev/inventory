@@ -19,17 +19,19 @@ declare(strict_types=1);
  * 2. Vercel's filesystem is read-only outside of /tmp, so Laravel's writable
  *    paths have to be redirected. Otherwise the package manifest cannot be
  *    written ("The bootstrap/cache directory must be present and writable") and
- *    error logging fails while reporting that error.
+ *    error logging fails while reporting that error. The log channel is forced
+ *    to stderr because a file channel can only fail on this platform.
  *
- * Environment variables that are already set always win over these defaults.
+ * Environment variables that are already set always win over these defaults,
+ * except for LOG_CHANNEL.
  */
 
 $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['PHP_SELF'] = '/index.php';
 $_SERVER['ORIG_SCRIPT_NAME'] = '/index.php';
 
-$env = static function (string $key, string $value): void {
-    if (getenv($key) !== false && getenv($key) !== '') {
+$env = static function (string $key, string $value, bool $force = false): void {
+    if (! $force && getenv($key) !== false && getenv($key) !== '') {
         return;
     }
 
@@ -44,7 +46,13 @@ $env('APP_PACKAGES_CACHE', '/tmp/cache/packages.php');
 $env('APP_ROUTES_CACHE', '/tmp/cache/routes.php');
 $env('APP_SERVICES_CACHE', '/tmp/cache/services.php');
 $env('VIEW_COMPILED_PATH', '/tmp/cache/views');
-$env('LOG_CHANNEL', 'stderr');
+
+// A file log channel cannot work on the read-only filesystem, and stderr is
+// what reaches the function logs.
+$env('LOG_CHANNEL', 'stderr', force: true);
+
+// Never render framework stack traces to API clients.
+$env('APP_DEBUG', 'false', force: true);
 
 if (! is_dir('/tmp/cache/views')) {
     @mkdir('/tmp/cache/views', 0777, true);
