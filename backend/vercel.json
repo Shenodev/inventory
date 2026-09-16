@@ -9,13 +9,6 @@
       "maxDuration": 10
     }
   },
-  "redirects": [
-    {
-      "source": "/index.php",
-      "destination": "/api/index.php",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
       "source": "/(.*)",
