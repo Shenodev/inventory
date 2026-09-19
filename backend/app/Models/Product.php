@@ -21,6 +21,9 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Collection<int, OrderItem> $orderItems
  * @property-read Collection<int, StockMovement> $stockMovements
+ * @property-read Collection<int, PurchaseOrderItem> $purchaseOrderItems
+ * @property-read Collection<int, SalesOrderItem> $salesOrderItems
+ * @property-read Collection<int, ReturnEntry> $returnEntries
  */
 class Product extends Model
 {
@@ -60,5 +63,29 @@ class Product extends Model
     public function stockMovements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    /**
+     * @return HasMany<PurchaseOrderItem, $this>
+     */
+    public function purchaseOrderItems(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderItem::class);
+    }
+
+    /**
+     * @return HasMany<SalesOrderItem, $this>
+     */
+    public function salesOrderItems(): HasMany
+    {
+        return $this->hasMany(SalesOrderItem::class);
+    }
+
+    /**
+     * @return HasMany<ReturnEntry, $this>
+     */
+    public function returnEntries(): HasMany
+    {
+        return $this->hasMany(ReturnEntry::class);
     }
 }

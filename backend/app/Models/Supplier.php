@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Database\Factories\CustomerFactory;
+use Database\Factories\SupplierFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,12 +18,11 @@ use Illuminate\Support\Carbon;
  * @property string|null $phone
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Collection<int, Order> $orders
- * @property-read Collection<int, SalesOrder> $salesOrders
+ * @property-read Collection<int, PurchaseOrder> $purchaseOrders
  */
-class Customer extends Model
+class Supplier extends Model
 {
-    /** @use HasFactory<CustomerFactory> */
+    /** @use HasFactory<SupplierFactory> */
     use HasFactory;
 
     /** @var list<string> */
@@ -34,18 +33,10 @@ class Customer extends Model
     ];
 
     /**
-     * @return HasMany<Order, $this>
+     * @return HasMany<PurchaseOrder, $this>
      */
-    public function orders(): HasMany
+    public function purchaseOrders(): HasMany
     {
-        return $this->hasMany(Order::class);
-    }
-
-    /**
-     * @return HasMany<SalesOrder, $this>
-     */
-    public function salesOrders(): HasMany
-    {
-        return $this->hasMany(SalesOrder::class);
+        return $this->hasMany(PurchaseOrder::class);
     }
 }
