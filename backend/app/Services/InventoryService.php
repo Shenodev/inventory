@@ -82,6 +82,23 @@ class InventoryService
         ];
     }
 
+    /**
+     * Units physically available to sell: total stock minus reserved and sold
+     * legacy orders.
+     */
+    public function availableQuantity(Product $product): int
+    {
+        $reserved = (int) $product->orderItems()
+            ->whereHas('order', fn (Builder $order): Builder => $order->where('status', OrderStatus::Reserved->value))
+            ->sum('quantity');
+
+        $sold = (int) $product->orderItems()
+            ->whereHas('order', fn (Builder $order): Builder => $order->where('status', OrderStatus::Sold->value))
+            ->sum('quantity');
+
+        return $product->total_stock - $reserved - $sold;
+    }
+
     private function withAvailability(Builder $query): Builder
     {
         return $query

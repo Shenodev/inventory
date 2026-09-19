@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\OrderStatus;
 use App\Enums\SalesOrderStatus;
 use App\Enums\StockMovementType;
 use App\Enums\TransactionType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\AddSalesOrderItemRequest;
+use App\Http\Requests\Api\ProcessReturnRequest;
 use App\Http\Requests\Api\StoreSalesOrderRequest;
 use App\Models\Product;
+use App\Models\ReturnEntry;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderItem;
 use App\Models\StockMovement;
 use App\Models\Transaction;
-use Illuminate\Database\Eloquent\Builder;
+use App\Services\InventoryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,8 @@ use Illuminate\Validation\ValidationException;
 
 class SalesOrderController extends Controller
 {
+    public function __construct(private readonly InventoryService $inventory) {}
+
     public function index(Request $request): JsonResponse
     {
         $status = $request->string('status')->trim()->toString() ?: null;
@@ -234,7 +237,7 @@ class SalesOrderController extends Controller
                     continue;
                 }
 
-                $available = $this->availableStock($product);
+                $available = $this->inventory->availableQuantity($product);
 
                 if ($item->quantity > $available) {
                     throw ValidationException::withMessages([
@@ -281,6 +284,115 @@ class SalesOrderController extends Controller
         ]);
     }
 
+    /**
+     * Atomically process a return against a shipped sales order: put the goods
+     * back in stock, log the inbound movements, record the return and register
+     * a negative income (refund) transaction.
+     */
+    public function processReturn(ProcessReturnRequest $request, SalesOrder $salesOrder): JsonResponse
+    {
+        $result = DB::transaction(function () use ($request, $salesOrder): array {
+            $locked = SalesOrder::query()
+                ->whereKey($salesOrder->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->status !== SalesOrderStatus::Shipped) {
+                throw ValidationException::withMessages([
+                    'status' => "Sales order #{$locked->id} is {$locked->status->value} and cannot be returned.",
+                ]);
+            }
+
+            $lines = $locked->items()->get()->keyBy('product_id');
+
+            foreach ($request->validated('items') as $line) {
+                $item = $lines->get((int) $line['product_id']);
+
+                if (! $item instanceof SalesOrderItem) {
+                    throw ValidationException::withMessages([
+                        'items' => "Product #{$line['product_id']} is not on sales order #{$locked->id}.",
+                    ]);
+                }
+
+                $alreadyReturned = (int) ReturnEntry::query()
+                    ->where('sales_order_id', $locked->id)
+                    ->where('product_id', (int) $line['product_id'])
+                    ->sum('quantity');
+
+                if ($alreadyReturned + (int) $line['quantity'] > $item->quantity) {
+                    throw ValidationException::withMessages([
+                        'items' => sprintf(
+                            'Cannot return %d units of product #%d: %d were sold on sales order #%d and %d were already returned.',
+                            (int) $line['quantity'],
+                            (int) $line['product_id'],
+                            $item->quantity,
+                            $locked->id,
+                            $alreadyReturned,
+                        ),
+                    ]);
+                }
+            }
+
+            /** @var Collection<int, Product> $products */
+            $products = Product::query()
+                ->whereIn('id', collect($request->validated('items'))->pluck('product_id'))
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $refund = 0.0;
+
+            foreach ($request->validated('items') as $line) {
+                $quantity = (int) $line['quantity'];
+                $product = $products->get((int) $line['product_id']);
+
+                if (! $product instanceof Product) {
+                    continue;
+                }
+
+                $product->total_stock += $quantity;
+                $product->save();
+
+                $product->stockMovements()->create([
+                    'order_id' => null,
+                    'type' => StockMovementType::In,
+                    'quantity' => $quantity,
+                    'note' => "Sales order #{$locked->id} return",
+                ]);
+
+                ReturnEntry::query()->create([
+                    'sales_order_id' => $locked->id,
+                    'product_id' => (int) $line['product_id'],
+                    'quantity' => $quantity,
+                    'reason' => isset($line['reason']) && trim((string) $line['reason']) !== '' ? $line['reason'] : null,
+                ]);
+
+                $item = $lines->get((int) $line['product_id']);
+
+                if ($item instanceof SalesOrderItem) {
+                    $refund += (float) $item->unit_price * $quantity;
+                }
+            }
+
+            $refund = round($refund, 2);
+
+            $locked->transactions()->create([
+                'type' => TransactionType::Income,
+                'amount' => -$refund,
+            ]);
+
+            return ['sales_order' => $locked, 'refund' => $refund];
+        });
+
+        $result['sales_order']->load(['customer:id,name', 'items.product:id,sku,name', 'transactions']);
+
+        return response()->json([
+            'message' => 'Return processed. Refund of '.number_format($result['refund'], 2).' logged against sales order #'.$salesOrder->id.'.',
+            'refund' => $result['refund'],
+            'sales_order' => $this->present($result['sales_order']),
+        ]);
+    }
+
     private function assertReserved(SalesOrder $salesOrder): void
     {
         if ($salesOrder->status !== SalesOrderStatus::Reserved) {
@@ -304,23 +416,6 @@ class SalesOrderController extends Controller
             ->keyBy('id');
 
         return $products;
-    }
-
-    /**
-     * Units physically available to sell, mirroring the Products page:
-     * total stock minus reserved and sold legacy orders.
-     */
-    private function availableStock(Product $product): int
-    {
-        $reserved = (int) $product->orderItems()
-            ->whereHas('order', fn (Builder $order): Builder => $order->where('status', OrderStatus::Reserved->value))
-            ->sum('quantity');
-
-        $sold = (int) $product->orderItems()
-            ->whereHas('order', fn (Builder $order): Builder => $order->where('status', OrderStatus::Sold->value))
-            ->sum('quantity');
-
-        return $product->total_stock - $reserved - $sold;
     }
 
     /**

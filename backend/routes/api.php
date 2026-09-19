@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DamageController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FinancialController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseOrderController;
@@ -39,4 +41,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/sales-orders/{salesOrder}/items', [SalesOrderController::class, 'storeItem']);
     Route::delete('/sales-orders/{salesOrder}/items/{item}', [SalesOrderController::class, 'destroyItem']);
     Route::post('/sales-orders/{salesOrder}/fulfill', [SalesOrderController::class, 'fulfill']);
+    Route::post('/sales-orders/{salesOrder}/return', [SalesOrderController::class, 'processReturn']);
+
+    Route::post('/damages', [DamageController::class, 'store']);
+
+    Route::get('/financials/overview', [FinancialController::class, 'overview']);
 });

@@ -21,6 +21,7 @@ class ProductFactory extends Factory
             'sku' => strtoupper(fake()->unique()->bothify('SKU-####-???')),
             'name' => fake()->unique()->words(3, true),
             'price' => fake()->randomFloat(2, 5, 500),
+            'cost' => fake()->randomFloat(2, 3, 200),
             'total_stock' => fake()->numberBetween(0, 500),
         ];
     }

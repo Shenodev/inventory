@@ -9,4 +9,5 @@ enum StockMovementType: string
     case In = 'in';
     case Out = 'out';
     case Adjustment = 'adjustment';
+    case Damage = 'damage';
 }
