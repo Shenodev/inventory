@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PurchaseOrderController;
+use App\Http\Controllers\Api\SalesOrderController;
 use App\Http\Controllers\Api\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,4 +32,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/purchase-orders/{purchaseOrder}/items', [PurchaseOrderController::class, 'storeItem']);
     Route::delete('/purchase-orders/{purchaseOrder}/items/{item}', [PurchaseOrderController::class, 'destroyItem']);
     Route::post('/purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive']);
+
+    Route::get('/sales-orders', [SalesOrderController::class, 'index']);
+    Route::post('/sales-orders', [SalesOrderController::class, 'store']);
+    Route::get('/sales-orders/{salesOrder}', [SalesOrderController::class, 'show']);
+    Route::post('/sales-orders/{salesOrder}/items', [SalesOrderController::class, 'storeItem']);
+    Route::delete('/sales-orders/{salesOrder}/items/{item}', [SalesOrderController::class, 'destroyItem']);
+    Route::post('/sales-orders/{salesOrder}/fulfill', [SalesOrderController::class, 'fulfill']);
 });
