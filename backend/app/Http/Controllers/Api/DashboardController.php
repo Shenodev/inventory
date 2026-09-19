@@ -8,8 +8,8 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Product;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -17,15 +17,18 @@ class DashboardController extends Controller
 
     public function __invoke(): JsonResponse
     {
-        $totalProductsInStock = (int) Product::query()->sum('total_stock');
-
-        $totalRevenue = (float) Order::query()
-            ->where('status', OrderStatus::Sold->value)
-            ->sum('total');
-
-        $reservedOrders = Order::query()
-            ->where('status', OrderStatus::Reserved->value)
-            ->count();
+        // The three headline aggregates are answered in a single round trip
+        // instead of three, which matters because every request from the
+        // serverless runtime needs its own connection to the database.
+        $stats = DB::selectOne(
+            'select
+                (select coalesce(sum(products.total_stock), 0) from products) as total_stock,
+                (select coalesce(sum(orders.total), 0) from orders
+                    where orders.status = ?) as revenue,
+                (select count(*) from orders
+                    where orders.status = ?) as reserved_orders',
+            [OrderStatus::Sold->value, OrderStatus::Reserved->value],
+        );
 
         $recentlySold = Order::query()
             ->with([
@@ -57,9 +60,9 @@ class DashboardController extends Controller
             ->all();
 
         return response()->json([
-            'total_products_in_stock' => $totalProductsInStock,
-            'total_revenue' => number_format($totalRevenue, 2, '.', ''),
-            'reserved_orders' => $reservedOrders,
+            'total_products_in_stock' => (int) $stats->total_stock,
+            'total_revenue' => number_format((float) $stats->revenue, 2, '.', ''),
+            'reserved_orders' => (int) $stats->reserved_orders,
             'recently_sold' => $recentlySold,
         ]);
     }

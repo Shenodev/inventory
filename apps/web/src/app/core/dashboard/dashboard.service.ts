@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.base-url';
+import { BYPASS_CACHE } from '../http/api-cache.interceptor';
 
 export interface DashboardSoldItem {
   product_id: number;
@@ -30,7 +31,9 @@ export interface DashboardOverview {
 export class DashboardService {
   private readonly http = inject(HttpClient);
 
-  getOverview(): Observable<DashboardOverview> {
-    return this.http.get<DashboardOverview>(`${API_BASE_URL}/dashboard`);
+  getOverview(force = false): Observable<DashboardOverview> {
+    return this.http.get<DashboardOverview>(`${API_BASE_URL}/dashboard`, {
+      context: new HttpContext().set(BYPASS_CACHE, force),
+    });
   }
 }

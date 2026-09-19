@@ -16,9 +16,11 @@ const NAV_SOON: string[] = [];
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex min-h-screen bg-deep-slate font-sans text-slate-300">
-      <aside class="flex w-64 shrink-0 flex-col border-r border-white/5 bg-surface px-4 py-6">
-        <a routerLink="/" class="flex items-center gap-3 px-2">
+    <div class="flex h-screen overflow-hidden bg-deep-slate font-sans text-slate-300">
+      <aside
+        class="flex h-full w-64 shrink-0 flex-col border-r border-white/5 bg-surface px-4 py-6"
+      >
+        <a routerLink="/" class="flex shrink-0 items-center gap-3 px-2">
           <img
             src="/favicon-96x96.png"
             alt="ShenoInventory"
@@ -27,7 +29,7 @@ const NAV_SOON: string[] = [];
           <span class="font-heading text-lg font-semibold text-white">ShenoInventory</span>
         </a>
 
-        <nav class="mt-8 flex flex-col gap-1">
+        <nav class="mt-8 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           <a
             routerLink="/"
             routerLinkActive="bg-deep-slate text-white"
@@ -89,10 +91,10 @@ const NAV_SOON: string[] = [];
         </nav>
 
         @if (navSoon.length > 0) {
-          <p class="mt-8 px-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <p class="mt-8 shrink-0 px-3 text-xs font-medium uppercase tracking-wide text-slate-500">
             Coming soon
           </p>
-          <div class="mt-2 flex flex-col gap-1">
+          <div class="mt-2 flex shrink-0 flex-col gap-1">
             @for (item of navSoon; track item) {
               <span class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-500">
                 <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
@@ -102,7 +104,7 @@ const NAV_SOON: string[] = [];
           </div>
         }
 
-        <div class="mt-auto border-t border-white/5 pt-4">
+        <div class="mt-auto shrink-0 border-t border-white/5 pt-4">
           <div class="px-2">
             <p class="truncate text-sm font-medium text-white">
               {{ user()?.name ?? 'Demo User' }}
@@ -121,7 +123,7 @@ const NAV_SOON: string[] = [];
         </div>
       </aside>
 
-      <main class="min-w-0 flex-1 px-8 py-8">
+      <main class="min-w-0 flex-1 overflow-y-auto px-8 py-8">
         <router-outlet />
       </main>
     </div>

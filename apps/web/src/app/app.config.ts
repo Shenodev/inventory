@@ -10,13 +10,14 @@ import { provideClientHydration, withEventReplay } from '@angular/platform-brows
 import { provideFileRouter, requestContextInterceptor } from '@analogjs/router';
 
 import { authInterceptor } from './core/auth/auth.interceptor';
+import { apiCacheInterceptor } from './core/http/api-cache.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideFileRouter(),
     provideHttpClient(
-      withInterceptors([authInterceptor, requestContextInterceptor])
+      withInterceptors([apiCacheInterceptor, authInterceptor, requestContextInterceptor])
     ),
     provideClientHydration(withEventReplay()),
   ],

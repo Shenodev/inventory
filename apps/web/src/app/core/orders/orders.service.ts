@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.base-url';
+import { BYPASS_CACHE } from '../http/api-cache.interceptor';
 
 export interface OrderLine {
   order_id: number;
@@ -28,11 +29,15 @@ export interface SoldOrdersResponse {
 export class OrdersService {
   private readonly http = inject(HttpClient);
 
-  reserved(): Observable<ReservedOrdersResponse> {
-    return this.http.get<ReservedOrdersResponse>(`${API_BASE_URL}/orders/reserved`);
+  reserved(force = false): Observable<ReservedOrdersResponse> {
+    return this.http.get<ReservedOrdersResponse>(`${API_BASE_URL}/orders/reserved`, {
+      context: new HttpContext().set(BYPASS_CACHE, force),
+    });
   }
 
-  sold(): Observable<SoldOrdersResponse> {
-    return this.http.get<SoldOrdersResponse>(`${API_BASE_URL}/orders/sold`);
+  sold(force = false): Observable<SoldOrdersResponse> {
+    return this.http.get<SoldOrdersResponse>(`${API_BASE_URL}/orders/sold`, {
+      context: new HttpContext().set(BYPASS_CACHE, force),
+    });
   }
 }

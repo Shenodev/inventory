@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "regions": [
+    "fra1"
+  ],
   "installCommand": "echo \"No npm install required for the PHP API\"",
   "buildCommand": "echo \"No JS build required for the PHP API\"",
   "functions": {

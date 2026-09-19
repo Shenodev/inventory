@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_BASE_URL } from '../api.base-url';
+import { BYPASS_CACHE } from '../http/api-cache.interceptor';
 
 export type StockMovementType = 'in' | 'out';
 
@@ -45,8 +46,10 @@ export interface AdjustStockPayload {
 export class ProductsService {
   private readonly http = inject(HttpClient);
 
-  list(): Observable<ProductsResponse> {
-    return this.http.get<ProductsResponse>(`${API_BASE_URL}/products`);
+  list(force = false): Observable<ProductsResponse> {
+    return this.http.get<ProductsResponse>(`${API_BASE_URL}/products`, {
+      context: new HttpContext().set(BYPASS_CACHE, force),
+    });
   }
 
   adjustStock(productId: number, payload: AdjustStockPayload): Observable<AdjustStockResponse> {

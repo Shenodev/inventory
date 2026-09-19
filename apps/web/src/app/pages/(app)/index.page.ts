@@ -37,7 +37,7 @@ interface RecentSale {
       </div>
       <button
         type="button"
-        (click)="load()"
+        (click)="load(true)"
         [disabled]="loading()"
         class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -50,7 +50,7 @@ interface RecentSale {
         <p class="text-sm text-red-200">{{ message }}</p>
         <button
           type="button"
-          (click)="load()"
+          (click)="load(true)"
           class="shrink-0 rounded-xl bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500"
         >
           Retry
@@ -180,11 +180,11 @@ export default class DashboardPage {
     afterNextRender(() => this.load());
   }
 
-  protected load(): void {
+  protected load(force = false): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.dashboard.getOverview().subscribe({
+    this.dashboard.getOverview(force).subscribe({
       next: (overview) => {
         this.overview.set(overview);
         this.loading.set(false);

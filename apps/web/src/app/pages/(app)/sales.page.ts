@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { RouteMeta } from '@analogjs/router';
 
-import { formatCurrency, formatDate } from '../../core/format';
+import { formatCurrency, formatDate, formatNumber } from '../../core/format';
 import { OrderLine, OrdersService } from '../../core/orders/orders.service';
 
 export const routeMeta: RouteMeta = {
@@ -22,12 +22,37 @@ type Tab = 'reserved' | 'sold';
   selector: 'app-sales-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header>
-      <h1 class="font-heading text-2xl font-semibold text-white">Sales &amp; Reservations</h1>
-      <p class="mt-1 text-sm text-slate-400">
-        Exactly who reserved or bought what, and how much.
-      </p>
+    <header class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="font-heading text-2xl font-semibold text-white">Sales &amp; Reservations</h1>
+        <p class="mt-1 text-sm text-slate-400">
+          Exactly who reserved or bought what, and how much.
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="reload(true)"
+        [disabled]="activeLoading()"
+        class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {{ activeLoading() ? 'Refreshing…' : 'Refresh' }}
+      </button>
     </header>
+
+    @if (activeError(); as message) {
+      <div
+        class="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4"
+      >
+        <p class="text-sm text-red-200">{{ message }}</p>
+        <button
+          type="button"
+          (click)="reload(true)"
+          class="shrink-0 rounded-xl bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500"
+        >
+          Retry
+        </button>
+      </div>
+    }
 
     <div class="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Order views">
       <button
@@ -56,26 +81,96 @@ type Tab = 'reserved' | 'sold';
       </button>
     </div>
 
-    @if (activeError(); as message) {
-      <div
-        class="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4"
-      >
-        <p class="text-sm text-red-200">{{ message }}</p>
-        <button
-          type="button"
-          (click)="reload()"
-          class="shrink-0 rounded-xl bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500"
+    <section class="mt-6 grid gap-6 sm:grid-cols-3">
+      @if (tab() === 'reserved') {
+        <article class="rounded-xl bg-surface p-6">
+          <p class="text-sm font-medium text-slate-400">Reserved lines</p>
+          <p class="mt-2 font-heading text-2xl font-semibold text-white">
+            {{ formatNumber(reservedCount() ?? 0) }}
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Items awaiting pickup</p>
+        </article>
+        <article class="rounded-xl bg-surface p-6">
+          <p class="text-sm font-medium text-slate-400">Units reserved</p>
+          <p class="mt-2 font-heading text-2xl font-semibold text-amber-300">
+            {{ formatNumber(reservedUnits()) }}
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Across all reservations</p>
+        </article>
+        <article class="rounded-xl bg-surface p-6">
+          <p class="text-sm font-medium text-slate-400">Customers</p>
+          <p class="mt-2 font-heading text-2xl font-semibold text-white">
+            {{ formatNumber(reservedCustomers()) }}
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Who reserved something</p>
+        </article>
+      } @else {
+        <article class="rounded-xl bg-surface p-6">
+          <p class="text-sm font-medium text-slate-400">Sold lines</p>
+          <p class="mt-2 font-heading text-2xl font-semibold text-white">
+            {{ formatNumber(soldCount() ?? 0) }}
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Completed sales</p>
+        </article>
+        <article class="rounded-xl bg-surface p-6">
+          <p class="text-sm font-medium text-slate-400">Units sold</p>
+          <p class="mt-2 font-heading text-2xl font-semibold text-white">
+            {{ formatNumber(soldUnits()) }}
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Across all orders</p>
+        </article>
+        <article class="rounded-xl bg-surface p-6">
+          <p class="text-sm font-medium text-slate-400">Sale revenue</p>
+          <p class="mt-2 font-heading text-2xl font-semibold text-electric-cyan">
+            {{ soldRevenue() }}
+          </p>
+          <p class="mt-1 text-xs text-slate-500">Sum of line totals</p>
+        </article>
+      }
+    </section>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <label class="relative flex min-w-0 flex-1 items-center">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          class="pointer-events-none absolute left-3 h-4 w-4 text-slate-500"
         >
-          Retry
-        </button>
-      </div>
-    }
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.4-3.4" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Search by product, customer or order #…"
+          [value]="query()"
+          (input)="onQuery($event)"
+          class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+        />
+        @if (query() !== '') {
+          <button
+            type="button"
+            (click)="clearQuery()"
+            aria-label="Clear search"
+            class="absolute right-2 rounded-lg p-1 text-slate-400 transition-colors hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        }
+      </label>
+      <span class="text-sm text-slate-500">{{ resultLabel() }}</span>
+    </div>
 
     @if (tab() === 'reserved') {
-      <section class="mt-6 overflow-hidden rounded-xl bg-surface" role="tabpanel">
-        <div class="overflow-x-auto">
+      <section class="mt-4 overflow-hidden rounded-xl bg-surface" role="tabpanel">
+        <div class="max-h-[70vh] overflow-y-auto">
           <table class="w-full text-left text-sm">
-            <thead class="border-b border-white/5 text-xs uppercase tracking-wide text-slate-500">
+            <thead
+              class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
+            >
               <tr>
                 <th scope="col" class="px-6 py-3 font-medium">Product</th>
                 <th scope="col" class="px-6 py-3 font-medium">Customer</th>
@@ -84,7 +179,7 @@ type Tab = 'reserved' | 'sold';
               </tr>
             </thead>
             <tbody class="divide-y divide-white/5">
-              @for (line of reservedLines() ?? []; track line.order_id + '-' + line.product_id) {
+              @for (line of filteredLines(); track line.order_id + '-' + line.product_id) {
                 <tr class="transition-colors hover:bg-deep-slate/60">
                   <td class="px-6 py-4">
                     <p class="font-medium text-white">{{ line.product_name ?? 'Unknown product' }}</p>
@@ -103,7 +198,7 @@ type Tab = 'reserved' | 'sold';
               } @empty {
                 <tr>
                   <td colspan="4" class="px-6 py-10 text-center text-slate-500">
-                    {{ activeLoading() ? 'Loading reservations…' : 'No active reservations.' }}
+                    {{ emptyLabel() }}
                   </td>
                 </tr>
               }
@@ -112,10 +207,12 @@ type Tab = 'reserved' | 'sold';
         </div>
       </section>
     } @else {
-      <section class="mt-6 overflow-hidden rounded-xl bg-surface" role="tabpanel">
-        <div class="overflow-x-auto">
+      <section class="mt-4 overflow-hidden rounded-xl bg-surface" role="tabpanel">
+        <div class="max-h-[70vh] overflow-y-auto">
           <table class="w-full text-left text-sm">
-            <thead class="border-b border-white/5 text-xs uppercase tracking-wide text-slate-500">
+            <thead
+              class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
+            >
               <tr>
                 <th scope="col" class="px-6 py-3 font-medium">Product</th>
                 <th scope="col" class="px-6 py-3 font-medium">Customer</th>
@@ -126,7 +223,7 @@ type Tab = 'reserved' | 'sold';
               </tr>
             </thead>
             <tbody class="divide-y divide-white/5">
-              @for (line of soldLines() ?? []; track line.order_id + '-' + line.product_id) {
+              @for (line of filteredLines(); track line.order_id + '-' + line.product_id) {
                 <tr class="transition-colors hover:bg-deep-slate/60">
                   <td class="px-6 py-4">
                     <p class="font-medium text-white">{{ line.product_name ?? 'Unknown product' }}</p>
@@ -145,7 +242,7 @@ type Tab = 'reserved' | 'sold';
               } @empty {
                 <tr>
                   <td colspan="6" class="px-6 py-10 text-center text-slate-500">
-                    {{ activeLoading() ? 'Loading sales…' : 'No sales recorded yet.' }}
+                    {{ emptyLabel() }}
                   </td>
                 </tr>
               }
@@ -170,6 +267,8 @@ export default class SalesPage {
   protected readonly errorReserved = signal<string | null>(null);
   protected readonly errorSold = signal<string | null>(null);
 
+  protected readonly query = signal('');
+
   protected readonly reservedCount = computed(() => this.reservedLines()?.length ?? null);
   protected readonly soldCount = computed(() => this.soldLines()?.length ?? null);
 
@@ -180,6 +279,47 @@ export default class SalesPage {
   protected readonly activeError = computed(() =>
     this.tab() === 'reserved' ? this.errorReserved() : this.errorSold()
   );
+
+  protected readonly activeLines = computed<OrderLine[]>(() =>
+    this.tab() === 'reserved' ? this.reservedLines() ?? [] : this.soldLines() ?? []
+  );
+
+  protected readonly filteredLines = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+
+    if (needle === '') {
+      return this.activeLines();
+    }
+
+    return this.activeLines().filter(
+      (line) =>
+        (line.product_name ?? '').toLowerCase().includes(needle) ||
+        (line.customer_name ?? '').toLowerCase().includes(needle) ||
+        String(line.order_id).includes(needle)
+    );
+  });
+
+  protected readonly reservedUnits = computed(() =>
+    (this.reservedLines() ?? []).reduce((sum, line) => sum + line.quantity, 0)
+  );
+
+  protected readonly reservedCustomers = computed(() => {
+    const names = new Set(
+      (this.reservedLines() ?? []).map((line) => line.customer_name ?? 'Unknown')
+    );
+
+    return names.size;
+  });
+
+  protected readonly soldUnits = computed(() =>
+    (this.soldLines() ?? []).reduce((sum, line) => sum + line.quantity, 0)
+  );
+
+  protected readonly soldRevenue = computed(() => {
+    const total = (this.soldLines() ?? []).reduce((sum, line) => sum + Number(line.line_total), 0);
+
+    return formatCurrency(total.toFixed(2));
+  });
 
   constructor() {
     afterNextRender(() => {
@@ -198,12 +338,50 @@ export default class SalesPage {
     }
   }
 
-  protected reload(): void {
+  protected reload(force = false): void {
     if (this.tab() === 'reserved') {
-      this.loadReserved(true);
+      this.loadReserved(force);
     } else {
-      this.loadSold(true);
+      this.loadSold(force);
     }
+  }
+
+  protected onQuery(event: Event): void {
+    this.query.set((event.target as HTMLInputElement).value);
+  }
+
+  protected clearQuery(): void {
+    this.query.set('');
+  }
+
+  protected resultLabel(): string {
+    const needle = this.query().trim();
+
+    if (needle === '') {
+      const count = this.activeLines().length;
+
+      return `${count} ${this.tab() === 'reserved' ? 'reservation' : 'sale'}${count === 1 ? '' : 's'}`;
+    }
+
+    const count = this.filteredLines().length;
+
+    return `${count} match${count === 1 ? '' : 'es'} for "${needle}"`;
+  }
+
+  protected emptyLabel(): string {
+    if (this.activeLines().length === 0 && this.activeLoading()) {
+      return this.tab() === 'reserved'
+        ? 'Loading reservations…'
+        : 'Loading sales…';
+    }
+
+    if (this.query().trim() !== '') {
+      return 'No entries match your search.';
+    }
+
+    return this.tab() === 'reserved'
+      ? 'No active reservations.'
+      : 'No sales recorded yet.';
   }
 
   protected tabClass(tab: Tab): string {
@@ -214,6 +392,10 @@ export default class SalesPage {
 
   protected money(value: string): string {
     return formatCurrency(value);
+  }
+
+  protected formatNumber(value: number): string {
+    return formatNumber(value);
   }
 
   protected date(value: string | null): string {
@@ -228,7 +410,7 @@ export default class SalesPage {
     this.loadingReserved.set(true);
     this.errorReserved.set(null);
 
-    this.orders.reserved().subscribe({
+    this.orders.reserved(force).subscribe({
       next: ({ reserved }) => {
         this.reservedLines.set(reserved);
         this.loadingReserved.set(false);
@@ -248,7 +430,7 @@ export default class SalesPage {
     this.loadingSold.set(true);
     this.errorSold.set(null);
 
-    this.orders.sold().subscribe({
+    this.orders.sold(force).subscribe({
       next: ({ sold }) => {
         this.soldLines.set(sold);
         this.loadingSold.set(false);

@@ -47,6 +47,15 @@ const DEMO_PASSWORD = 'password';
           </div>
         </div>
 
+        @if (sessionExpired) {
+          <p
+            class="mt-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
+            role="status"
+          >
+            Your session expired. Please sign in again.
+          </p>
+        }
+
         <form class="mt-8" [formGroup]="form" (ngSubmit)="submit()">
           <label class="block text-sm font-medium text-slate-300" for="email">
             Email
@@ -109,6 +118,9 @@ export default class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly formBuilder = inject(NonNullableFormBuilder);
+
+  protected readonly sessionExpired =
+    this.router.parseUrl(this.router.url).queryParams['session'] === 'expired';
 
   protected readonly form = this.formBuilder.group({
     email: [DEMO_EMAIL, [Validators.required, Validators.email]],

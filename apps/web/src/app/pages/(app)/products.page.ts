@@ -4,18 +4,22 @@ import {
   Component,
   HostListener,
   afterNextRender,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouteMeta } from '@analogjs/router';
 
-import { formatCurrency } from '../../core/format';
+import { formatCurrency, formatNumber } from '../../core/format';
 import { Product, ProductsService } from '../../core/products/products.service';
 
 export const routeMeta: RouteMeta = {
   title: 'Products · ShenoInventory',
 };
+
+const PAGE_SIZE = 50;
+const LOW_STOCK_THRESHOLD = 10;
 
 @Component({
   selector: 'app-products-page',
@@ -31,7 +35,7 @@ export const routeMeta: RouteMeta = {
       </div>
       <button
         type="button"
-        (click)="load()"
+        (click)="load(true)"
         [disabled]="loading()"
         class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -62,7 +66,7 @@ export const routeMeta: RouteMeta = {
         <p class="text-sm text-red-200">{{ message }}</p>
         <button
           type="button"
-          (click)="load()"
+          (click)="load(true)"
           class="shrink-0 rounded-xl bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500"
         >
           Retry
@@ -70,10 +74,84 @@ export const routeMeta: RouteMeta = {
       </div>
     }
 
-    <section class="mt-6 overflow-hidden rounded-xl bg-surface">
-      <div class="overflow-x-auto">
+    <section class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Products tracked</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-white">
+          {{ formatNumber(products().length) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Items in the catalog</p>
+      </article>
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Out of stock</p>
+        <p
+          class="mt-2 font-heading text-2xl font-semibold"
+          [class]="outOfStockCount() > 0 ? 'text-red-300' : 'text-white'"
+        >
+          {{ formatNumber(outOfStockCount()) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Nothing left to sell</p>
+      </article>
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Low stock</p>
+        <p
+          class="mt-2 font-heading text-2xl font-semibold"
+          [class]="lowStockCount() > 0 ? 'text-amber-300' : 'text-white'"
+        >
+          {{ formatNumber(lowStockCount()) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">At or below {{ LOW_STOCK_THRESHOLD }} available</p>
+      </article>
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Available units</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-electric-cyan">
+          {{ formatNumber(totalAvailableUnits()) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Sum across all products</p>
+      </article>
+    </section>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <label class="relative flex min-w-0 flex-1 items-center">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          class="pointer-events-none absolute left-3 h-4 w-4 text-slate-500"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.4-3.4" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Search by name or SKU…"
+          [value]="query()"
+          (input)="onQuery($event)"
+          class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+        />
+        @if (query() !== '') {
+          <button
+            type="button"
+            (click)="clearQuery()"
+            aria-label="Clear search"
+            class="absolute right-2 rounded-lg p-1 text-slate-400 transition-colors hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        }
+      </label>
+      <span class="text-sm text-slate-500">{{ resultLabel() }}</span>
+    </div>
+
+    <section class="mt-4 overflow-hidden rounded-xl bg-surface">
+      <div class="max-h-[70vh] overflow-y-auto">
         <table class="w-full text-left text-sm">
-          <thead class="border-b border-white/5 text-xs uppercase tracking-wide text-slate-500">
+          <thead
+            class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
+          >
             <tr>
               <th scope="col" class="px-6 py-3 font-medium">Product</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Total Stock</th>
@@ -84,12 +162,12 @@ export const routeMeta: RouteMeta = {
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
-            @for (product of products(); track product.id) {
+            @for (product of visibleProducts(); track product.id) {
               <tr class="transition-colors hover:bg-deep-slate/60">
                 <td class="px-6 py-4">
                   <p class="font-medium text-white">{{ product.name }}</p>
                   <p class="mt-0.5 text-xs text-slate-500">
-                    {{ product.sku }} · {{ price(product.price) }}
+                    <span class="font-mono">{{ product.sku }}</span> · {{ price(product.price) }}
                   </p>
                 </td>
                 <td class="px-6 py-4 text-center font-medium text-white">
@@ -99,7 +177,10 @@ export const routeMeta: RouteMeta = {
                   {{ product.reserved_stock }}
                 </td>
                 <td class="px-6 py-4 text-center text-slate-300">{{ product.sold_stock }}</td>
-                <td class="px-6 py-4 text-center font-medium" [class]="availableClass(product.available_stock)">
+                <td
+                  class="px-6 py-4 text-center font-medium"
+                  [class]="availableClass(product.available_stock)"
+                >
                   {{ product.available_stock }}
                 </td>
                 <td class="px-6 py-4 text-right">
@@ -115,7 +196,7 @@ export const routeMeta: RouteMeta = {
             } @empty {
               <tr>
                 <td colspan="6" class="px-6 py-10 text-center text-slate-500">
-                  {{ loading() ? 'Loading products…' : 'No products found.' }}
+                  {{ emptyLabel() }}
                 </td>
               </tr>
             }
@@ -123,6 +204,18 @@ export const routeMeta: RouteMeta = {
         </table>
       </div>
     </section>
+
+    @if (filteredProducts().length > visibleProducts().length) {
+      <div class="mt-4 flex justify-center">
+        <button
+          type="button"
+          (click)="showMore()"
+          class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white"
+        >
+          Show more ({{ filteredProducts().length - visibleProducts().length }} remaining)
+        </button>
+      </div>
+    }
 
     @if (activeProduct(); as product) {
       <div
@@ -237,6 +330,8 @@ export const routeMeta: RouteMeta = {
   `,
 })
 export default class ProductsPage {
+  protected readonly LOW_STOCK_THRESHOLD = LOW_STOCK_THRESHOLD;
+
   private readonly productsService = inject(ProductsService);
   private readonly formBuilder = inject(NonNullableFormBuilder);
 
@@ -245,9 +340,45 @@ export default class ProductsPage {
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
+  protected readonly query = signal('');
+  protected readonly limit = signal(PAGE_SIZE);
+
   protected readonly activeProduct = signal<Product | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
+
+  protected readonly filteredProducts = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+
+    if (needle === '') {
+      return this.products();
+    }
+
+    return this.products().filter(
+      (product) =>
+        product.name.toLowerCase().includes(needle) ||
+        product.sku.toLowerCase().includes(needle)
+    );
+  });
+
+  protected readonly visibleProducts = computed(() =>
+    this.filteredProducts().slice(0, this.limit())
+  );
+
+  protected readonly outOfStockCount = computed(
+    () => this.products().filter((product) => product.available_stock <= 0).length
+  );
+
+  protected readonly lowStockCount = computed(
+    () =>
+      this.products().filter(
+        (product) => product.available_stock > 0 && product.available_stock <= LOW_STOCK_THRESHOLD
+      ).length
+  );
+
+  protected readonly totalAvailableUnits = computed(() =>
+    this.products().reduce((sum, product) => sum + product.available_stock, 0)
+  );
 
   protected readonly form = this.formBuilder.group({
     type: this.formBuilder.control<'in' | 'out'>('in', Validators.required),
@@ -266,11 +397,11 @@ export default class ProductsPage {
     }
   }
 
-  protected load(): void {
+  protected load(force = false): void {
     this.loading.set(true);
     this.error.set(null);
 
-    this.productsService.list().subscribe({
+    this.productsService.list(force).subscribe({
       next: ({ products }) => {
         this.products.set(products);
         this.loading.set(false);
@@ -280,6 +411,44 @@ export default class ProductsPage {
         this.error.set(this.messageFor(error, 'Unable to load products right now.'));
       },
     });
+  }
+
+  protected onQuery(event: Event): void {
+    this.query.set((event.target as HTMLInputElement).value);
+    this.limit.set(PAGE_SIZE);
+  }
+
+  protected clearQuery(): void {
+    this.query.set('');
+    this.limit.set(PAGE_SIZE);
+  }
+
+  protected showMore(): void {
+    this.limit.update((current) => current + PAGE_SIZE);
+  }
+
+  protected resultLabel(): string {
+    const needle = this.query().trim();
+
+    if (needle === '') {
+      return `${this.products().length} product${this.products().length === 1 ? '' : 's'}`;
+    }
+
+    const count = this.filteredProducts().length;
+
+    return `${count} match${count === 1 ? '' : 'es'} for "${needle}"`;
+  }
+
+  protected emptyLabel(): string {
+    if (this.loading()) {
+      return 'Loading products…';
+    }
+
+    if (this.query().trim() !== '') {
+      return 'No products match your search.';
+    }
+
+    return 'No products found.';
   }
 
   protected openAdjust(product: Product): void {
@@ -338,6 +507,10 @@ export default class ProductsPage {
 
   protected price(value: string): string {
     return formatCurrency(value);
+  }
+
+  protected formatNumber(value: number): string {
+    return formatNumber(value);
   }
 
   protected availableClass(available: number): string {
