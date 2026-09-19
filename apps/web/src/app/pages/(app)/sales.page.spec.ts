@@ -4,39 +4,36 @@ import { PLATFORM_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OrdersService } from '../../core/orders/orders.service';
+import { SalesOrdersService } from '../../core/sales/sales-orders.service';
+import { ToastService } from '../../core/ui/toast.service';
 import SalesPage from './sales.page';
 
 interface SalesPageInternals {
-  loadReserved(): void;
-  loadSold(): void;
-  selectTab(tab: 'reserved' | 'sold'): void;
+  load(force?: boolean): void;
 }
 
-const RESERVED_LINE = {
-  order_id: 11,
-  ordered_at: '2026-09-01T10:00:00+00:00',
-  customer_name: 'Alice Reserve',
-  product_id: 1,
-  product_name: 'Reserved Widget',
-  quantity: 3,
-  price: '19.99',
-  line_total: '59.97',
-  remaining_stock: 120,
+const RESERVED_ORDER = {
+  id: 13,
+  customer_id: 1,
+  customer: 'Alice Reserve',
+  status: 'reserved',
+  total_price: '105.00',
+  item_count: 2,
+  created_at: '2026-09-01T10:00:00+00:00',
+  updated_at: '2026-09-01T10:00:00+00:00',
 };
 
-const SOLD_LINE = {
-  order_id: 22,
-  ordered_at: '2026-09-02T10:00:00+00:00',
-  customer_name: 'Bob Buyer',
-  product_id: 2,
-  product_name: 'Sold Gadget',
-  quantity: 2,
-  price: '49.50',
-  line_total: '99.00',
-  remaining_stock: 40,
+const SHIPPED_ORDER = {
+  id: 12,
+  customer_id: 2,
+  customer: 'Bob Buyer',
+  status: 'shipped',
+  total_price: '99.00',
+  item_count: 3,
+  created_at: '2026-08-20T10:00:00+00:00',
+  updated_at: '2026-08-21T10:00:00+00:00',
 };
 
 describe('SalesPage', () => {
@@ -49,47 +46,63 @@ describe('SalesPage', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         {
-          provide: OrdersService,
+          provide: SalesOrdersService,
           useValue: {
-            reserved: () => of({ reserved: [RESERVED_LINE] }),
-            sold: () => of({ sold: [SOLD_LINE] }),
+            list: () => of({ sales_orders: [RESERVED_ORDER, SHIPPED_ORDER] }),
+            fulfill: (id: number) =>
+              of({
+                message: `Sales order #${id} fulfilled.`,
+                sales_order: { ...RESERVED_ORDER, status: 'shipped' },
+              }),
           },
         },
       ],
     }).compileComponents();
   });
 
-  it('lists who reserved what on the reserved tab', () => {
+  it('renders reserved and shipped orders and shows Fulfill & Ship on reserved rows', () => {
     const fixture = TestBed.createComponent(SalesPage);
-    const component = fixture.componentInstance as unknown as SalesPageInternals;
-
-    component.loadReserved();
-    component.loadSold();
+    (fixture.componentInstance as unknown as SalesPageInternals).load();
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
-    expect(text).toContain('Reserved Qty');
-    expect(text).toContain('Reserved Widget');
+    expect(text).toContain('#13');
     expect(text).toContain('Alice Reserve');
+    expect(text).toContain('#12');
+    expect(text).toContain('Bob Buyer');
+    expect(text).toContain('Fulfill & Ship');
+    expect(text).toContain('$105.00');
   });
 
-  it('lists buyer, sale price and quantity on the sold tab', () => {
+  it('fulfills a reserved order and raises a success toast', () => {
     const fixture = TestBed.createComponent(SalesPage);
     const component = fixture.componentInstance as unknown as SalesPageInternals;
+    const service = TestBed.inject(SalesOrdersService);
+    const fulfillSpy = vi.spyOn(service, 'fulfill');
 
-    component.loadReserved();
-    component.loadSold();
-    component.selectTab('sold');
+    component.load();
     fixture.detectChanges();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    const fulfill = buttons.find((element) => element.textContent?.includes('Fulfill & Ship'));
 
-    expect(text).toContain('Qty Sold');
-    expect(text).toContain('Sale Price');
-    expect(text).toContain('Sold Gadget');
-    expect(text).toContain('Bob Buyer');
-    expect(text).toContain('$49.50');
-    expect(text).toContain('$99.00');
+    expect(fulfill).toBeTruthy();
+    fulfill?.click();
+    fixture.detectChanges();
+
+    const dialog = (fixture.nativeElement as HTMLElement).querySelector('[role="alertdialog"]');
+    expect(dialog).toBeTruthy();
+
+    const confirm = Array.from(dialog?.querySelectorAll('button') ?? []).find((element) =>
+      element.textContent?.includes('Fulfill & Ship')
+    );
+    confirm?.click();
+    fixture.detectChanges();
+
+    expect(fulfillSpy).toHaveBeenCalledWith(13);
+
+    const toast = TestBed.inject(ToastService);
+    expect(toast.toasts().some((item) => item.type === 'success' && item.message.includes('13'))).toBe(true);
   });
 });

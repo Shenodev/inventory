@@ -2,44 +2,60 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
+  HostListener,
   afterNextRender,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatDate, formatNumber } from '../../core/format';
-import { OrderLine, OrdersService } from '../../core/orders/orders.service';
+import {
+  SalesOrderListItem,
+  SalesOrdersService,
+  SalesOrderStatus,
+} from '../../core/sales/sales-orders.service';
+import { ToastService } from '../../core/ui/toast.service';
 
 export const routeMeta: RouteMeta = {
-  title: 'Sales & Reservations · ShenoInventory',
+  title: 'Sales Orders · ShenoInventory',
 };
 
-type Tab = 'reserved' | 'sold';
+type Tab = 'all' | SalesOrderStatus;
 
 @Component({
   selector: 'app-sales-page',
+  imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-heading text-2xl font-semibold text-white">Sales &amp; Reservations</h1>
+        <h1 class="font-heading text-2xl font-semibold text-white">Active Orders</h1>
         <p class="mt-1 text-sm text-slate-400">
-          Exactly who reserved or bought what, and how much.
+          Reserved and shipped sales orders.
         </p>
       </div>
-      <button
-        type="button"
-        (click)="reload(true)"
-        [disabled]="activeLoading()"
-        class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {{ activeLoading() ? 'Refreshing…' : 'Refresh' }}
-      </button>
+      <div class="flex gap-3">
+        <button
+          type="button"
+          (click)="reload(true)"
+          [disabled]="loading()"
+          class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {{ loading() ? 'Refreshing…' : 'Refresh' }}
+        </button>
+        <a
+          routerLink="/sales/create"
+          class="rounded-xl bg-electric-cyan px-4 py-2 text-sm font-medium text-deep-slate transition-colors hover:bg-cyan-400"
+        >
+          New Sales Order
+        </a>
+      </div>
     </header>
 
-    @if (activeError(); as message) {
+    @if (error(); as message) {
       <div
         class="mt-6 flex items-center justify-between gap-4 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-4"
       >
@@ -54,7 +70,43 @@ type Tab = 'reserved' | 'sold';
       </div>
     }
 
-    <div class="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Order views">
+    <section class="mt-6 grid gap-6 sm:grid-cols-3">
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Active orders</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-white">
+          {{ formatNumber(activeOrders().length) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Reserved or shipped</p>
+      </article>
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Reserved value</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-amber-300">
+          {{ formatCurrency(reservedValue()) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Awaiting fulfillment</p>
+      </article>
+      <article class="rounded-xl bg-surface p-6">
+        <p class="text-sm font-medium text-slate-400">Shipped value</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-emerald-300">
+          {{ formatCurrency(shippedValue()) }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Fulfilled and delivered</p>
+      </article>
+    </section>
+
+    <div class="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Sales order views">
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="tab() === 'all'"
+        (click)="selectTab('all')"
+        [class]="tabClass('all')"
+      >
+        All
+        @if (orders().length > 0) {
+          <span class="ml-1 text-xs opacity-70">({{ orders().length }})</span>
+        }
+      </button>
       <button
         type="button"
         role="tab"
@@ -70,64 +122,16 @@ type Tab = 'reserved' | 'sold';
       <button
         type="button"
         role="tab"
-        [attr.aria-selected]="tab() === 'sold'"
-        (click)="selectTab('sold')"
-        [class]="tabClass('sold')"
+        [attr.aria-selected]="tab() === 'shipped'"
+        (click)="selectTab('shipped')"
+        [class]="tabClass('shipped')"
       >
-        Sold
-        @if (soldCount() !== null) {
-          <span class="ml-1 text-xs opacity-70">({{ soldCount() }})</span>
+        Shipped
+        @if (shippedCount() !== null) {
+          <span class="ml-1 text-xs opacity-70">({{ shippedCount() }})</span>
         }
       </button>
     </div>
-
-    <section class="mt-6 grid gap-6 sm:grid-cols-3">
-      @if (tab() === 'reserved') {
-        <article class="rounded-xl bg-surface p-6">
-          <p class="text-sm font-medium text-slate-400">Reserved lines</p>
-          <p class="mt-2 font-heading text-2xl font-semibold text-white">
-            {{ formatNumber(reservedCount() ?? 0) }}
-          </p>
-          <p class="mt-1 text-xs text-slate-500">Items awaiting pickup</p>
-        </article>
-        <article class="rounded-xl bg-surface p-6">
-          <p class="text-sm font-medium text-slate-400">Units reserved</p>
-          <p class="mt-2 font-heading text-2xl font-semibold text-amber-300">
-            {{ formatNumber(reservedUnits()) }}
-          </p>
-          <p class="mt-1 text-xs text-slate-500">Across all reservations</p>
-        </article>
-        <article class="rounded-xl bg-surface p-6">
-          <p class="text-sm font-medium text-slate-400">Customers</p>
-          <p class="mt-2 font-heading text-2xl font-semibold text-white">
-            {{ formatNumber(reservedCustomers()) }}
-          </p>
-          <p class="mt-1 text-xs text-slate-500">Who reserved something</p>
-        </article>
-      } @else {
-        <article class="rounded-xl bg-surface p-6">
-          <p class="text-sm font-medium text-slate-400">Sold lines</p>
-          <p class="mt-2 font-heading text-2xl font-semibold text-white">
-            {{ formatNumber(soldCount() ?? 0) }}
-          </p>
-          <p class="mt-1 text-xs text-slate-500">Completed sales</p>
-        </article>
-        <article class="rounded-xl bg-surface p-6">
-          <p class="text-sm font-medium text-slate-400">Units sold</p>
-          <p class="mt-2 font-heading text-2xl font-semibold text-white">
-            {{ formatNumber(soldUnits()) }}
-          </p>
-          <p class="mt-1 text-xs text-slate-500">Across all orders</p>
-        </article>
-        <article class="rounded-xl bg-surface p-6">
-          <p class="text-sm font-medium text-slate-400">Sale revenue</p>
-          <p class="mt-2 font-heading text-2xl font-semibold text-electric-cyan">
-            {{ soldRevenue() }}
-          </p>
-          <p class="mt-1 text-xs text-slate-500">Sum of line totals</p>
-        </article>
-      }
-    </section>
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <label class="relative flex min-w-0 flex-1 items-center">
@@ -143,7 +147,7 @@ type Tab = 'reserved' | 'sold';
         </svg>
         <input
           type="search"
-          placeholder="Search by product, customer or order #…"
+          placeholder="Search by customer or order #…"
           [value]="query()"
           (input)="onQuery($event)"
           class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
@@ -164,186 +168,234 @@ type Tab = 'reserved' | 'sold';
       <span class="text-sm text-slate-500">{{ resultLabel() }}</span>
     </div>
 
-    @if (tab() === 'reserved') {
-      <section class="mt-4 overflow-hidden rounded-xl bg-surface" role="tabpanel">
-        <div class="max-h-[70vh] overflow-y-auto">
-          <table class="w-full text-left text-sm">
-            <thead
-              class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
-            >
-              <tr>
-                <th scope="col" class="px-6 py-3 font-medium">Product</th>
-                <th scope="col" class="px-6 py-3 font-medium">Customer</th>
-                <th scope="col" class="px-6 py-3 text-center font-medium">Reserved Qty</th>
-                <th scope="col" class="px-6 py-3 text-right font-medium">Reserved On</th>
+    <section class="mt-4 overflow-hidden rounded-xl bg-surface">
+      <div class="max-h-[70vh] overflow-y-auto">
+        <table class="w-full text-left text-sm">
+          <thead
+            class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
+          >
+            <tr>
+              <th scope="col" class="px-6 py-3 font-medium">Order</th>
+              <th scope="col" class="px-6 py-3 font-medium">Customer</th>
+              <th scope="col" class="px-6 py-3 text-center font-medium">Items</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Total</th>
+              <th scope="col" class="px-6 py-3 font-medium">Placed</th>
+              <th scope="col" class="px-6 py-3 text-center font-medium">Status</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            @for (order of filteredOrders(); track order.id) {
+              <tr class="transition-colors hover:bg-deep-slate/60">
+                <td class="px-6 py-4">
+                  <p class="font-medium text-white">#{{ order.id }}</p>
+                  <p class="mt-0.5 text-xs text-slate-500">{{ formatDate(order.created_at) }}</p>
+                </td>
+                <td class="px-6 py-4 text-slate-300">{{ order.customer ?? '—' }}</td>
+                <td class="px-6 py-4 text-center text-slate-300">{{ order.item_count }}</td>
+                <td class="px-6 py-4 text-right font-medium text-white">
+                  {{ formatCurrency(order.total_price) }}
+                </td>
+                <td class="px-6 py-4 text-slate-400">{{ formatDate(order.created_at) }}</td>
+                <td class="px-6 py-4 text-center">
+                  <span
+                    class="inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                    [class]="statusBadge(order.status)"
+                  >
+                    {{ order.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex justify-end">
+                    @if (order.status === 'reserved') {
+                      <button
+                        type="button"
+                        (click)="requestFulfill(order)"
+                        [disabled]="fulfilling()"
+                        class="rounded-xl bg-electric-cyan px-4 py-1.5 text-sm font-semibold text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Fulfill &amp; Ship
+                      </button>
+                    } @else {
+                      <span class="text-sm text-slate-500">
+                        @if (order.status === 'shipped') {
+                          {{ formatCurrency(order.total_price) }} recorded
+                        } @else {
+                          —
+                        }
+                      </span>
+                    }
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-white/5">
-              @for (line of filteredLines(); track line.order_id + '-' + line.product_id) {
-                <tr class="transition-colors hover:bg-deep-slate/60">
-                  <td class="px-6 py-4">
-                    <p class="font-medium text-white">{{ line.product_name ?? 'Unknown product' }}</p>
-                    <p class="mt-0.5 text-xs text-slate-500">Order #{{ line.order_id }}</p>
-                  </td>
-                  <td class="px-6 py-4 text-slate-300">
-                    {{ line.customer_name ?? 'Unknown customer' }}
-                  </td>
-                  <td class="px-6 py-4 text-center font-medium text-amber-300">
-                    {{ line.quantity }}
-                  </td>
-                  <td class="px-6 py-4 text-right text-slate-400">
-                    {{ date(line.ordered_at) }}
-                  </td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="4" class="px-6 py-10 text-center text-slate-500">
-                    {{ emptyLabel() }}
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      </section>
-    } @else {
-      <section class="mt-4 overflow-hidden rounded-xl bg-surface" role="tabpanel">
-        <div class="max-h-[70vh] overflow-y-auto">
-          <table class="w-full text-left text-sm">
-            <thead
-              class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
-            >
+            } @empty {
               <tr>
-                <th scope="col" class="px-6 py-3 font-medium">Product</th>
-                <th scope="col" class="px-6 py-3 font-medium">Customer</th>
-                <th scope="col" class="px-6 py-3 text-center font-medium">Qty Sold</th>
-                <th scope="col" class="px-6 py-3 text-right font-medium">Sale Price</th>
-                <th scope="col" class="px-6 py-3 text-right font-medium">Total</th>
-                <th scope="col" class="px-6 py-3 text-right font-medium">Sold On</th>
+                <td colspan="7" class="px-6 py-10 text-center text-slate-500">
+                  {{ emptyLabel() }}
+                </td>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-white/5">
-              @for (line of filteredLines(); track line.order_id + '-' + line.product_id) {
-                <tr class="transition-colors hover:bg-deep-slate/60">
-                  <td class="px-6 py-4">
-                    <p class="font-medium text-white">{{ line.product_name ?? 'Unknown product' }}</p>
-                    <p class="mt-0.5 text-xs text-slate-500">Order #{{ line.order_id }}</p>
-                  </td>
-                  <td class="px-6 py-4 text-slate-300">
-                    {{ line.customer_name ?? 'Unknown customer' }}
-                  </td>
-                  <td class="px-6 py-4 text-center font-medium text-white">{{ line.quantity }}</td>
-                  <td class="px-6 py-4 text-right text-slate-300">{{ money(line.price) }}</td>
-                  <td class="px-6 py-4 text-right font-medium text-electric-cyan">
-                    {{ money(line.line_total) }}
-                  </td>
-                  <td class="px-6 py-4 text-right text-slate-400">{{ date(line.ordered_at) }}</td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="6" class="px-6 py-10 text-center text-slate-500">
-                    {{ emptyLabel() }}
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    @if (fulfillTarget(); as order) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
+        (click)="cancelFulfill()"
+      >
+        <div
+          class="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6 text-left"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="fulfill-so-title"
+          (click)="$event.stopPropagation()"
+        >
+          <h2 id="fulfill-so-title" class="font-heading text-lg font-semibold text-white">
+            Fulfill and ship order #{{ order.id }}?
+          </h2>
+          <p class="mt-2 text-sm text-slate-400">
+            This deducts the reserved quantities from stock, logs the outbound stock movements, and
+            records an
+            <span class="font-medium text-white">income of {{ formatCurrency(order.total_price) }}</span>
+            for {{ order.customer ?? 'the customer' }}.
+          </p>
+          <p class="mt-2 text-sm text-slate-400">
+            If there isn't enough stock available, the order stays reserved and nothing changes.
+          </p>
+          <p class="mt-2 text-sm text-slate-400">This action is permanent and cannot be undone.</p>
+          @if (formError(); as message) {
+            <p
+              class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+              role="alert"
+            >
+              {{ message }}
+            </p>
+          }
+          <div class="mt-6 flex gap-3">
+            <button
+              type="button"
+              (click)="cancelFulfill()"
+              [disabled]="fulfilling()"
+              class="flex-1 rounded-xl border border-white/10 px-4 py-3 font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-60"
+            >
+              Not yet
+            </button>
+            <button
+              type="button"
+              (click)="confirmFulfill()"
+              [disabled]="fulfilling()"
+              class="flex-1 rounded-xl bg-electric-cyan px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ fulfilling() ? 'Fulfilling…' : 'Fulfill &amp; Ship' }}
+            </button>
+          </div>
         </div>
-      </section>
+      </div>
     }
   `,
 })
 export default class SalesPage {
-  private readonly orders = inject(OrdersService);
+  private readonly salesOrdersService = inject(SalesOrdersService);
+  private readonly toast = inject(ToastService);
 
-  protected readonly tab = signal<Tab>('reserved');
+  protected readonly orders = signal<SalesOrderListItem[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly error = signal<string | null>(null);
 
-  protected readonly reservedLines = signal<OrderLine[] | null>(null);
-  protected readonly soldLines = signal<OrderLine[] | null>(null);
-
-  protected readonly loadingReserved = signal(false);
-  protected readonly loadingSold = signal(false);
-
-  protected readonly errorReserved = signal<string | null>(null);
-  protected readonly errorSold = signal<string | null>(null);
-
+  protected readonly tab = signal<Tab>('all');
   protected readonly query = signal('');
 
-  protected readonly reservedCount = computed(() => this.reservedLines()?.length ?? null);
-  protected readonly soldCount = computed(() => this.soldLines()?.length ?? null);
+  protected readonly fulfillTarget = signal<SalesOrderListItem | null>(null);
+  protected readonly fulfilling = signal(false);
+  protected readonly formError = signal<string | null>(null);
 
-  protected readonly activeLoading = computed(() =>
-    this.tab() === 'reserved' ? this.loadingReserved() : this.loadingSold()
+  protected readonly activeOrders = computed(() =>
+    this.orders().filter((order) => order.status === 'reserved' || order.status === 'shipped')
   );
 
-  protected readonly activeError = computed(() =>
-    this.tab() === 'reserved' ? this.errorReserved() : this.errorSold()
-  );
+  protected readonly visibleOrders = computed(() => {
+    const current = this.tab();
 
-  protected readonly activeLines = computed<OrderLine[]>(() =>
-    this.tab() === 'reserved' ? this.reservedLines() ?? [] : this.soldLines() ?? []
-  );
+    if (current === 'all') {
+      return this.orders();
+    }
 
-  protected readonly filteredLines = computed(() => {
+    return this.orders().filter((order) => order.status === current);
+  });
+
+  protected readonly filteredOrders = computed(() => {
     const needle = this.query().trim().toLowerCase();
 
     if (needle === '') {
-      return this.activeLines();
+      return this.visibleOrders();
     }
 
-    return this.activeLines().filter(
-      (line) =>
-        (line.product_name ?? '').toLowerCase().includes(needle) ||
-        (line.customer_name ?? '').toLowerCase().includes(needle) ||
-        String(line.order_id).includes(needle)
+    return this.visibleOrders().filter(
+      (order) =>
+        (order.customer ?? '').toLowerCase().includes(needle) ||
+        String(order.id).includes(needle)
     );
   });
 
-  protected readonly reservedUnits = computed(() =>
-    (this.reservedLines() ?? []).reduce((sum, line) => sum + line.quantity, 0)
+  protected readonly reservedCount = computed(() =>
+    this.orders().some((order) => order.status === 'reserved')
+      ? this.orders().filter((order) => order.status === 'reserved').length
+      : null
   );
 
-  protected readonly reservedCustomers = computed(() => {
-    const names = new Set(
-      (this.reservedLines() ?? []).map((line) => line.customer_name ?? 'Unknown')
-    );
-
-    return names.size;
-  });
-
-  protected readonly soldUnits = computed(() =>
-    (this.soldLines() ?? []).reduce((sum, line) => sum + line.quantity, 0)
+  protected readonly shippedCount = computed(() =>
+    this.orders().some((order) => order.status === 'shipped')
+      ? this.orders().filter((order) => order.status === 'shipped').length
+      : null
   );
 
-  protected readonly soldRevenue = computed(() => {
-    const total = (this.soldLines() ?? []).reduce((sum, line) => sum + Number(line.line_total), 0);
+  protected readonly reservedValue = computed(() =>
+    this.orders()
+      .filter((order) => order.status === 'reserved')
+      .reduce((sum, order) => sum + Number(order.total_price), 0)
+      .toFixed(2)
+  );
 
-    return formatCurrency(total.toFixed(2));
-  });
+  protected readonly shippedValue = computed(() =>
+    this.orders()
+      .filter((order) => order.status === 'shipped')
+      .reduce((sum, order) => sum + Number(order.total_price), 0)
+      .toFixed(2)
+  );
 
   constructor() {
-    afterNextRender(() => {
-      this.loadReserved();
-      this.loadSold();
+    afterNextRender(() => this.load());
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.cancelFulfill();
+  }
+
+  protected load(force = false): void {
+    this.loading.set(true);
+    this.error.set(null);
+
+    this.salesOrdersService.list(force).subscribe({
+      next: ({ sales_orders }) => {
+        this.orders.set(sales_orders);
+        this.loading.set(false);
+      },
+      error: (error: unknown) => {
+        this.loading.set(false);
+        this.error.set(this.messageFor(error, 'Unable to load sales orders right now.'));
+      },
     });
+  }
+
+  protected reload(force = false): void {
+    this.load(force);
   }
 
   protected selectTab(tab: Tab): void {
     this.tab.set(tab);
-
-    if (tab === 'reserved') {
-      this.loadReserved();
-    } else {
-      this.loadSold();
-    }
-  }
-
-  protected reload(force = false): void {
-    if (this.tab() === 'reserved') {
-      this.loadReserved(force);
-    } else {
-      this.loadSold(force);
-    }
   }
 
   protected onQuery(event: Event): void {
@@ -358,39 +410,88 @@ export default class SalesPage {
     const needle = this.query().trim();
 
     if (needle === '') {
-      const count = this.activeLines().length;
-
-      return `${count} ${this.tab() === 'reserved' ? 'reservation' : 'sale'}${count === 1 ? '' : 's'}`;
+      return `${this.visibleOrders().length} order${this.visibleOrders().length === 1 ? '' : 's'}`;
     }
 
-    const count = this.filteredLines().length;
+    const count = this.filteredOrders().length;
 
     return `${count} match${count === 1 ? '' : 'es'} for "${needle}"`;
   }
 
   protected emptyLabel(): string {
-    if (this.activeLines().length === 0 && this.activeLoading()) {
-      return this.tab() === 'reserved'
-        ? 'Loading reservations…'
-        : 'Loading sales…';
+    if (this.loading()) {
+      return 'Loading sales orders…';
     }
 
     if (this.query().trim() !== '') {
-      return 'No entries match your search.';
+      return 'No orders match your search.';
     }
 
-    return this.tab() === 'reserved'
-      ? 'No active reservations.'
-      : 'No sales recorded yet.';
+    if (this.tab() !== 'all') {
+      return `No ${this.tab()} sales orders.`;
+    }
+
+    return 'No sales orders yet. Create one to get started.';
   }
 
   protected tabClass(tab: Tab): string {
-    return this.tab() === tab
-      ? 'rounded-xl bg-electric-cyan px-4 py-2 text-sm font-medium text-deep-slate transition-colors'
-      : 'rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white';
+    const active =
+      this.tab() === tab
+        ? 'border-electric-cyan/40 bg-electric-cyan/10 text-electric-cyan'
+        : 'border-white/10 bg-surface text-slate-400 hover:text-slate-200';
+
+    return `rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${active}`;
   }
 
-  protected money(value: string): string {
+  protected statusBadge(status: SalesOrderStatus): string {
+    switch (status) {
+      case 'reserved':
+        return 'border-amber-400/30 bg-amber-400/10 text-amber-300';
+      case 'shipped':
+        return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300';
+      default:
+        return 'border-red-400/30 bg-red-400/10 text-red-300';
+    }
+  }
+
+  protected requestFulfill(order: SalesOrderListItem): void {
+    this.formError.set(null);
+    this.fulfillTarget.set(order);
+  }
+
+  protected cancelFulfill(): void {
+    if (this.fulfilling()) {
+      return;
+    }
+
+    this.fulfillTarget.set(null);
+  }
+
+  protected confirmFulfill(): void {
+    const order = this.fulfillTarget();
+
+    if (order === null || this.fulfilling()) {
+      return;
+    }
+
+    this.fulfilling.set(true);
+    this.formError.set(null);
+
+    this.salesOrdersService.fulfill(order.id).subscribe({
+      next: ({ sales_order }) => {
+        this.fulfilling.set(false);
+        this.fulfillTarget.set(null);
+        this.upsertListItem(sales_order);
+        this.toast.show(`Order #${sales_order.id} fulfilled and shipped. Stock and income updated.`);
+      },
+      error: (error: unknown) => {
+        this.fulfilling.set(false);
+        this.toast.show(this.messageFor(error, 'Unable to fulfill this order right now.'), 'error');
+      },
+    });
+  }
+
+  protected formatCurrency(value: string | number): string {
     return formatCurrency(value);
   }
 
@@ -398,52 +499,22 @@ export default class SalesPage {
     return formatNumber(value);
   }
 
-  protected date(value: string | null): string {
+  protected formatDate(value: string | null): string {
     return formatDate(value);
   }
 
-  protected loadReserved(force = false): void {
-    if (this.loadingReserved() || (!force && this.reservedLines() !== null)) {
-      return;
-    }
-
-    this.loadingReserved.set(true);
-    this.errorReserved.set(null);
-
-    this.orders.reserved(force).subscribe({
-      next: ({ reserved }) => {
-        this.reservedLines.set(reserved);
-        this.loadingReserved.set(false);
-      },
-      error: (error: unknown) => {
-        this.loadingReserved.set(false);
-        this.errorReserved.set(this.messageFor(error, 'Unable to load reservations right now.'));
-      },
-    });
-  }
-
-  protected loadSold(force = false): void {
-    if (this.loadingSold() || (!force && this.soldLines() !== null)) {
-      return;
-    }
-
-    this.loadingSold.set(true);
-    this.errorSold.set(null);
-
-    this.orders.sold(force).subscribe({
-      next: ({ sold }) => {
-        this.soldLines.set(sold);
-        this.loadingSold.set(false);
-      },
-      error: (error: unknown) => {
-        this.loadingSold.set(false);
-        this.errorSold.set(this.messageFor(error, 'Unable to load sales right now.'));
-      },
-    });
+  private upsertListItem(order: SalesOrderListItem): void {
+    this.orders.update((list) => [order, ...list.filter((item) => item.id !== order.id)]);
   }
 
   private messageFor(error: unknown, fallback: string): string {
     if (error instanceof HttpErrorResponse) {
+      if (error.status === 409 || error.status === 422) {
+        const body = error.error as { message?: string; errors?: Record<string, string[]> } | null;
+        const first = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+        return first ?? body?.message ?? fallback;
+      }
+
       if (error.status === 401) {
         return 'Your session expired. Please sign in again.';
       }

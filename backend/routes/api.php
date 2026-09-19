@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DamageController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FinancialController;
@@ -27,6 +28,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/orders/sold', [OrderController::class, 'sold']);
 
     Route::apiResource('/suppliers', SupplierController::class);
+
+    Route::get('/customers', [CustomerController::class, 'index']);
+    Route::post('/customers', [CustomerController::class, 'store']);
 
     Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
     Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);

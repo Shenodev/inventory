@@ -4,6 +4,7 @@ import { RouteMeta } from '@analogjs/router';
 
 import { authGuard } from '../core/auth/auth.guard';
 import { AuthService } from '../core/auth/auth.service';
+import { ToastService } from '../core/ui/toast.service';
 
 export const routeMeta: RouteMeta = {
   canActivate: [authGuard],
@@ -69,6 +70,26 @@ export const routeMeta: RouteMeta = {
           </a>
 
           <a
+            routerLink="/customers"
+            routerLinkActive="bg-deep-slate text-white"
+            [routerLinkActiveOptions]="{ exact: true }"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              class="h-5 w-5"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Customers
+          </a>
+
+          <a
             routerLink="/sales"
             routerLinkActive="bg-deep-slate text-white"
             [routerLinkActiveOptions]="{ exact: true }"
@@ -84,7 +105,7 @@ export const routeMeta: RouteMeta = {
               <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3Z" />
               <path d="M9 8h6M9 12h6" />
             </svg>
-            Sales &amp; Reservations
+            Sales
           </a>
 
           <a
@@ -150,13 +171,50 @@ export const routeMeta: RouteMeta = {
         <router-outlet />
       </main>
     </div>
+
+    <div
+      class="pointer-events-none fixed right-5 top-5 z-[100] flex w-full max-w-sm flex-col gap-3"
+      aria-live="polite"
+    >
+      @for (toast of toasts(); track toast.id) {
+        <div
+          class="pointer-events-auto rounded-xl border px-4 py-3 text-sm"
+          role="status"
+          [class]="
+            toast.type === 'error'
+              ? 'border-red-500/40 bg-surface text-red-200'
+              : 'border-electric-cyan/40 bg-surface text-slate-200'
+          "
+        >
+          <div class="flex items-start justify-between gap-3">
+            <p class="min-w-0 flex-1">{{ toast.message }}</p>
+            <button
+              type="button"
+              (click)="dismissToast(toast.id)"
+              aria-label="Dismiss notification"
+              class="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
   `,
 })
 export default class AppShell {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly toaster = inject(ToastService);
 
   protected readonly user = this.auth.currentUser;
+  protected readonly toasts = this.toaster.toasts;
+
+  protected dismissToast(id: number): void {
+    this.toaster.dismiss(id);
+  }
 
   protected signOut(): void {
     this.auth.logout().subscribe({
