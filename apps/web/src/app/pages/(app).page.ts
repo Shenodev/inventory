@@ -9,8 +9,6 @@ export const routeMeta: RouteMeta = {
   canActivate: [authGuard],
 };
 
-const NAV_SOON: string[] = [];
-
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
@@ -88,21 +86,46 @@ const NAV_SOON: string[] = [];
             </svg>
             Sales &amp; Reservations
           </a>
-        </nav>
 
-        @if (navSoon.length > 0) {
-          <p class="mt-8 shrink-0 px-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-            Coming soon
-          </p>
-          <div class="mt-2 flex shrink-0 flex-col gap-1">
-            @for (item of navSoon; track item) {
-              <span class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-500">
-                <span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
-                {{ item }}
-              </span>
-            }
-          </div>
-        }
+          <a
+            routerLink="/suppliers"
+            routerLinkActive="bg-deep-slate text-white"
+            [routerLinkActiveOptions]="{ exact: true }"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              class="h-5 w-5"
+            >
+              <path d="M3 7h13v10H3zM16 10h3l2 3v4h-5z" />
+              <circle cx="7.5" cy="17.5" r="1.5" />
+              <circle cx="17.5" cy="17.5" r="1.5" />
+            </svg>
+            Suppliers
+          </a>
+
+          <a
+            routerLink="/purchase-orders"
+            routerLinkActive="bg-deep-slate text-white"
+            [routerLinkActiveOptions]="{ exact: true }"
+            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              class="h-5 w-5"
+            >
+              <path d="M6 3h8l4 4v14H6V3Z" />
+              <path d="M14 3v4h4M9 12h6M9 16h6" />
+            </svg>
+            Purchase Orders
+          </a>
+        </nav>
 
         <div class="mt-auto shrink-0 border-t border-white/5 pt-4">
           <div class="px-2">
@@ -134,7 +157,6 @@ export default class AppShell {
   private readonly router = inject(Router);
 
   protected readonly user = this.auth.currentUser;
-  protected readonly navSoon = NAV_SOON;
 
   protected signOut(): void {
     this.auth.logout().subscribe({
