@@ -4,7 +4,7 @@ import { PLATFORM_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductsService } from '../../core/products/products.service';
 import { PurchaseOrdersService } from '../../core/procurement/purchase-orders.service';
@@ -69,7 +69,13 @@ const DETAIL = {
   transactions: [],
 };
 
+const addItem = vi.fn(() => of({ message: 'Item added.', purchase_order: DETAIL }));
+
 describe('PurchaseOrdersPage', () => {
+  beforeEach(() => {
+    addItem.mockClear();
+  });
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [PurchaseOrdersPage],
@@ -84,7 +90,7 @@ describe('PurchaseOrdersPage', () => {
             list: () => of({ purchase_orders: [LIST_ITEM] }),
             show: () => of({ purchase_order: DETAIL }),
             store: () => of({ message: 'Purchase order created.', purchase_order: DETAIL }),
-            addItem: () => of({ message: 'Item added.', purchase_order: DETAIL }),
+            addItem,
             removeItem: () => of({ message: 'Item removed.', purchase_order: DETAIL }),
             receive: () =>
               of({
@@ -152,5 +158,57 @@ describe('PurchaseOrdersPage', () => {
 
     expect(text).toContain('received');
     expect(text).toContain('stock and expenses updated');
+  });
+
+  it('adds items through the FormArray until submit posts each line', () => {
+    const fixture = TestBed.createComponent(PurchaseOrdersPage);
+    (fixture.componentInstance as unknown as PurchaseOrdersPageInternals).load();
+    fixture.detectChanges();
+    (fixture.componentInstance as unknown as PurchaseOrdersPageInternals).selectPurchaseOrder(7);
+    fixture.detectChanges();
+
+    const native = fixture.nativeElement as HTMLElement;
+
+    const addLine = Array.from(native.querySelectorAll('button')).find((element) =>
+      element.textContent?.trim() === '+ Add line'
+    );
+
+    expect(addLine).toBeTruthy();
+
+    addLine?.click();
+    fixture.detectChanges();
+
+    expect(native.textContent).toContain('Select a product…');
+
+    const select = native.querySelector('[formControlName="productId"]') as HTMLSelectElement | null;
+    expect(select).toBeTruthy();
+
+    select!.selectedIndex = 1;
+    select!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const unitCost = native.querySelector('[formControlName="unitCost"]') as HTMLInputElement | null;
+    expect(unitCost).toBeTruthy();
+    expect(unitCost?.value).toBe('25.00');
+
+    const quantity = native.querySelector('[formControlName="quantity"]') as HTMLInputElement | null;
+    quantity!.value = '5';
+    quantity!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const addItems = Array.from(native.querySelectorAll('button')).find((element) =>
+      element.textContent?.includes('Add items')
+    );
+
+    expect(addItems).toBeTruthy();
+    addItems?.click();
+    fixture.detectChanges();
+
+    expect(addItem).toHaveBeenCalledWith(7, {
+      product_id: 16,
+      quantity: 5,
+      unit_cost: '25.00',
+    });
+    expect(native.textContent).toContain('Added 1 line item to purchase order #7.');
   });
 });

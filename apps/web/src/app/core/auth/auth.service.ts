@@ -8,8 +8,10 @@ import { AuthenticatedUser, AuthSessionStore } from './auth-session.store';
 export type { AuthenticatedUser } from './auth-session.store';
 
 export interface LoginResponse {
-  token: string;
+  access_token: string;
+  refresh_token: string;
   token_type: string;
+  expires_in: number;
   user: AuthenticatedUser;
 }
 
@@ -26,7 +28,8 @@ export class AuthService {
       .post<LoginResponse>(`${API_BASE_URL}/auth/login`, { email, password })
       .pipe(
         tap((response) => {
-          this.session.setToken(response.token);
+          this.session.setToken(response.access_token);
+          this.session.setRefreshToken(response.refresh_token);
           this.session.setUser(response.user);
         })
       );

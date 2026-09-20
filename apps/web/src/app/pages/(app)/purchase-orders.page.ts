@@ -8,7 +8,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormArray,
+  FormControl,
+  FormGroup,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatDate, formatNumber } from '../../core/format';
@@ -26,6 +33,12 @@ export const routeMeta: RouteMeta = {
 };
 
 type Tab = 'all' | PurchaseOrderStatus;
+
+interface ItemLineControls {
+  productId: FormControl<number | null>;
+  quantity: FormControl<number>;
+  unitCost: FormControl<string>;
+}
 
 const QUANTITY_PATTERN = /^\d+(\.\d{1,2})?$/;
 
@@ -336,59 +349,113 @@ const QUANTITY_PATTERN = /^\d+(\.\d{1,2})?$/;
             <form
               class="mt-6 border-t border-white/5 pt-5"
               [formGroup]="itemForm"
-              (ngSubmit)="addItem()"
+              (ngSubmit)="submitItemLines()"
             >
-              <div class="flex flex-wrap items-end gap-3">
-                <label class="min-w-0 flex-1">
-                  <span class="block text-sm font-medium text-slate-300">Product</span>
-                  <select
-                    formControlName="productId"
-                    (change)="onProductSelected($event)"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2.5 text-sm text-white outline-none focus:border-electric-cyan"
-                    [class]="{ 'border-red-400/50': itemForm.controls.productId.touched && itemForm.controls.productId.invalid }"
-                  >
-                    <option [ngValue]="null" disabled>Select a product…</option>
-                    @for (product of products(); track product.id) {
-                      <option [ngValue]="product.id">{{ product.name }} ({{ product.sku }})</option>
-                    }
-                  </select>
-                </label>
-                <label class="w-24">
-                  <span class="block text-sm font-medium text-slate-300">Qty</span>
-                  <input
-                    type="number"
-                    min="1"
-                    formControlName="quantity"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2.5 text-sm text-white outline-none focus:border-electric-cyan"
-                  />
-                </label>
-                <label class="w-32">
-                  <span class="block text-sm font-medium text-slate-300">Unit cost</span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    formControlName="unitCost"
-                    placeholder="0.00"
-                    class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
-                  />
-                </label>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="font-heading text-sm font-semibold text-white">Add line items</h3>
                 <button
-                  type="submit"
+                  type="button"
+                  (click)="addItemLine()"
                   [disabled]="savingLine()"
-                  class="rounded-xl bg-electric-cyan px-4 py-2.5 text-sm font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {{ savingLine() ? 'Adding…' : 'Add item' }}
+                  + Add line
                 </button>
               </div>
 
-              @if (formError(); as message) {
+              @if (itemLines.controls.length === 0) {
                 <p
-                  class="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-                  role="alert"
+                  class="mt-4 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-slate-500"
                 >
-                  {{ message }}
+                  No line items yet — click “Add line” to start entering items.
                 </p>
+              } @else {
+                <div formArrayName="items" class="mt-4 space-y-3">
+                  @for (line of itemLines.controls; track $index) {
+                    <div
+                      class="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-deep-slate/40 p-3"
+                      [formGroup]="line"
+                    >
+                      <label class="min-w-0 flex-1">
+                        <span class="block text-xs font-medium text-slate-300">Product</span>
+                        <select
+                          formControlName="productId"
+                          (change)="onProductSelected($index, $event)"
+                          class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2 text-sm text-white outline-none focus:border-electric-cyan"
+                          [class]="{
+                            'border-red-400/50':
+                              line.controls.productId.touched && line.controls.productId.invalid,
+                          }"
+                        >
+                          <option [ngValue]="null" disabled>Select a product…</option>
+                          @for (product of products(); track product.id) {
+                            <option [ngValue]="product.id">
+                              {{ product.name }} ({{ product.sku }})
+                            </option>
+                          }
+                        </select>
+                      </label>
+                      <label class="w-20">
+                        <span class="block text-xs font-medium text-slate-300">Qty</span>
+                        <input
+                          type="number"
+                          min="1"
+                          formControlName="quantity"
+                          class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2 text-sm text-white outline-none focus:border-electric-cyan"
+                        />
+                      </label>
+                      <label class="w-28">
+                        <span class="block text-xs font-medium text-slate-300">Unit cost</span>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          formControlName="unitCost"
+                          placeholder="0.00"
+                          class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        (click)="removeItemLine($index)"
+                        [disabled]="savingLine()"
+                        [attr.aria-label]="'Remove line ' + ($index + 1)"
+                        class="rounded-lg border border-white/10 p-2 text-slate-400 transition-colors hover:border-red-400/40 hover:text-red-300 disabled:opacity-50"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4">
+                          <path d="M6 6l12 12M18 6 6 18" />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                </div>
+
+                @if (formError(); as message) {
+                  <p
+                    class="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                    role="alert"
+                  >
+                    {{ message }}
+                  </p>
+                }
+
+                <div class="mt-4 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    (click)="clearItemLines()"
+                    [disabled]="savingLine()"
+                    class="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="submit"
+                    [disabled]="savingLine() || itemLines.length === 0"
+                    class="rounded-xl bg-electric-cyan px-4 py-2.5 text-sm font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {{ savingLine() ? 'Adding…' : 'Add items' }}
+                  </button>
+                </div>
               }
             </form>
           }
@@ -564,13 +631,12 @@ export default class PurchaseOrdersPage {
   protected readonly receiveTarget = signal<PurchaseOrder | null>(null);
 
   protected readonly itemForm = this.formBuilder.group({
-    productId: this.formBuilder.control<number | null>(null, Validators.required),
-    quantity: this.formBuilder.control(1, [Validators.required, Validators.min(1), Validators.max(1000000)]),
-    unitCost: this.formBuilder.control('', [
-      Validators.required,
-      Validators.pattern(QUANTITY_PATTERN),
-    ]),
+    items: this.formBuilder.array<FormGroup<ItemLineControls>>([]),
   });
+
+  protected get itemLines(): FormArray<FormGroup<ItemLineControls>> {
+    return this.itemForm.get('items') as FormArray<FormGroup<ItemLineControls>>;
+  }
 
   protected readonly createForm = this.formBuilder.group({
     supplierId: this.formBuilder.control<number | null>(null, Validators.required),
@@ -714,17 +780,45 @@ export default class PurchaseOrdersPage {
     });
   }
 
-  protected onProductSelected(event: Event): void {
-    const productId = Number((event.target as HTMLSelectElement).value);
+  protected addItemLine(): void {
+    if (this.savingLine()) {
+      return;
+    }
 
+    this.itemLines.push(this.createItemLine());
+  }
+
+  protected removeItemLine(index: number): void {
+    if (this.savingLine()) {
+      return;
+    }
+
+    this.itemLines.removeAt(index);
+  }
+
+  protected clearItemLines(): void {
+    if (this.savingLine()) {
+      return;
+    }
+
+    this.itemLines.clear();
+    this.itemForm.markAsPristine();
+    this.itemForm.markAsUntouched();
+    this.formError.set(null);
+  }
+
+  protected onProductSelected(index: number, event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const productId = Number(select.value.split(':').pop());
     const product = this.products().find((item) => item.id === productId);
+    const line = this.itemLines.at(index);
 
-    if (product !== undefined) {
-      this.itemForm.controls.unitCost.setValue(product.price);
+    if (product !== undefined && line !== null) {
+      line.controls.unitCost.setValue(product.price);
     }
   }
 
-  protected addItem(): void {
+  protected submitItemLines(): void {
     const order = this.detail();
 
     if (order === null || order.status !== 'pending' || this.savingLine()) {
@@ -736,33 +830,67 @@ export default class PurchaseOrdersPage {
       return;
     }
 
-    const { productId, quantity, unitCost } = this.itemForm.getRawValue();
+    const lines = this.itemLines.controls
+      .map((line) => line.getRawValue())
+      .filter((line) => line.productId !== null);
 
-    if (productId === null) {
+    if (lines.length === 0) {
       return;
     }
 
     this.savingLine.set(true);
     this.formError.set(null);
 
+    this.postItemLine(order.id, lines, 0);
+  }
+
+  private createItemLine(): FormGroup<ItemLineControls> {
+    return this.formBuilder.group({
+      productId: this.formBuilder.control<number | null>(null, Validators.required),
+      quantity: this.formBuilder.control(1, [
+        Validators.required,
+        Validators.min(1),
+        Validators.max(1000000),
+      ]),
+      unitCost: this.formBuilder.control('', [
+        Validators.required,
+        Validators.pattern(QUANTITY_PATTERN),
+      ]),
+    });
+  }
+
+  private postItemLine(
+    orderId: number,
+    lines: Array<{ productId: number | null; quantity: number; unitCost: string }>,
+    index: number
+  ): void {
+    const line = lines[index];
+
+    if (line === undefined || line.productId === null) {
+      this.savingLine.set(false);
+      this.itemLines.clear();
+      this.itemForm.markAsPristine();
+      this.itemForm.markAsUntouched();
+      this.notice.set(
+        `Added ${lines.length} line item${lines.length === 1 ? '' : 's'} to purchase order #${orderId}.`
+      );
+      return;
+    }
+
     this.purchaseOrdersService
-      .addItem(order.id, {
-        product_id: productId,
-        quantity,
-        unit_cost: unitCost.trim(),
+      .addItem(orderId, {
+        product_id: line.productId,
+        quantity: line.quantity,
+        unit_cost: line.unitCost.trim(),
       })
       .subscribe({
         next: ({ purchase_order }) => {
-          this.savingLine.set(false);
           this.applyDetail(purchase_order);
-          this.notice.set(
-            `Added to purchase order #${purchase_order.id}: ${quantity} × ${this.productName(productId)}.`
-          );
-          this.itemForm.patchValue({ quantity: 1 });
+          this.postItemLine(orderId, lines, index + 1);
         },
         error: (error: unknown) => {
           this.savingLine.set(false);
-          this.formError.set(this.messageFor(error, 'Unable to add the item right now.'));
+          this.formError.set(this.messageFor(error, 'Unable to add the items right now.'));
         },
       });
   }

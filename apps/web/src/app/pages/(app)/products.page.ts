@@ -100,7 +100,7 @@ const LOW_STOCK_THRESHOLD = 10;
         >
           {{ formatNumber(lowStockCount()) }}
         </p>
-        <p class="mt-1 text-xs text-slate-500">At or below {{ LOW_STOCK_THRESHOLD }} available</p>
+        <p class="mt-1 text-xs text-slate-500">At or below each product's reorder point</p>
       </article>
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Available units</p>
@@ -144,6 +144,33 @@ const LOW_STOCK_THRESHOLD = 10;
         }
       </label>
       <span class="text-sm text-slate-500">{{ resultLabel() }}</span>
+    </div>
+
+    <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Quick stock filters">
+      <button
+        type="button"
+        role="switch"
+        [attr.aria-checked]="lowStockFilter()"
+        (click)="toggleLowStock()"
+        [class]="filterToggleClass(lowStockFilter())"
+      >
+        Low Stock
+        @if (lowStockCount() > 0) {
+          <span class="ml-1 text-xs opacity-70">({{ formatNumber(lowStockCount()) }})</span>
+        }
+      </button>
+      <button
+        type="button"
+        role="switch"
+        [attr.aria-checked]="outOfStockFilter()"
+        (click)="toggleOutOfStock()"
+        [class]="filterToggleClass(outOfStockFilter())"
+      >
+        Out of Stock
+        @if (outOfStockCount() > 0) {
+          <span class="ml-1 text-xs opacity-70">({{ formatNumber(outOfStockCount()) }})</span>
+        }
+      </button>
     </div>
 
     <section class="mt-4 overflow-hidden rounded-xl bg-surface">
@@ -330,8 +357,6 @@ const LOW_STOCK_THRESHOLD = 10;
   `,
 })
 export default class ProductsPage {
-  protected readonly LOW_STOCK_THRESHOLD = LOW_STOCK_THRESHOLD;
-
   private readonly productsService = inject(ProductsService);
   private readonly formBuilder = inject(NonNullableFormBuilder);
 
@@ -343,22 +368,46 @@ export default class ProductsPage {
   protected readonly query = signal('');
   protected readonly limit = signal(PAGE_SIZE);
 
+  protected readonly lowStockFilter = signal(false);
+  protected readonly outOfStockFilter = signal(false);
+
   protected readonly activeProduct = signal<Product | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
 
   protected readonly filteredProducts = computed(() => {
     const needle = this.query().trim().toLowerCase();
+    const lowFilter = this.lowStockFilter();
+    const outFilter = this.outOfStockFilter();
 
-    if (needle === '') {
-      return this.products();
-    }
-
-    return this.products().filter(
-      (product) =>
+    return this.products().filter((product) => {
+      const matchesQuery =
+        needle === '' ||
         product.name.toLowerCase().includes(needle) ||
-        product.sku.toLowerCase().includes(needle)
-    );
+        product.sku.toLowerCase().includes(needle);
+
+      if (!matchesQuery) {
+        return false;
+      }
+
+      const available = product.available_stock;
+      const isOutOfStock = available === 0;
+      const isLowStock = available > 0 && available <= this.reorderPoint(product);
+
+      if (lowFilter && outFilter) {
+        return isLowStock || isOutOfStock;
+      }
+
+      if (lowFilter) {
+        return isLowStock;
+      }
+
+      if (outFilter) {
+        return isOutOfStock;
+      }
+
+      return true;
+    });
   });
 
   protected readonly visibleProducts = computed(() =>
@@ -366,13 +415,13 @@ export default class ProductsPage {
   );
 
   protected readonly outOfStockCount = computed(
-    () => this.products().filter((product) => product.available_stock <= 0).length
+    () => this.products().filter((product) => product.available_stock === 0).length
   );
 
   protected readonly lowStockCount = computed(
     () =>
       this.products().filter(
-        (product) => product.available_stock > 0 && product.available_stock <= LOW_STOCK_THRESHOLD
+        (product) => product.available_stock > 0 && product.available_stock <= this.reorderPoint(product)
       ).length
   );
 
@@ -423,18 +472,37 @@ export default class ProductsPage {
     this.limit.set(PAGE_SIZE);
   }
 
+  protected toggleLowStock(): void {
+    this.lowStockFilter.update((active) => !active);
+  }
+
+  protected toggleOutOfStock(): void {
+    this.outOfStockFilter.update((active) => !active);
+  }
+
+  protected filterToggleClass(active: boolean): string {
+    return active
+      ? 'rounded-xl border border-electric-cyan/40 bg-electric-cyan/10 px-4 py-2 text-sm font-medium text-electric-cyan transition-colors'
+      : 'rounded-xl border border-white/10 bg-surface px-4 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200';
+  }
+
   protected showMore(): void {
     this.limit.update((current) => current + PAGE_SIZE);
   }
 
   protected resultLabel(): string {
     const needle = this.query().trim();
+    const filtersActive = this.lowStockFilter() || this.outOfStockFilter();
 
-    if (needle === '') {
+    if (needle === '' && !filtersActive) {
       return `${this.products().length} product${this.products().length === 1 ? '' : 's'}`;
     }
 
     const count = this.filteredProducts().length;
+
+    if (needle === '') {
+      return `${count} of ${this.products().length} product${this.products().length === 1 ? '' : 's'}`;
+    }
 
     return `${count} match${count === 1 ? '' : 'es'} for "${needle}"`;
   }
@@ -446,6 +514,10 @@ export default class ProductsPage {
 
     if (this.query().trim() !== '') {
       return 'No products match your search.';
+    }
+
+    if (this.lowStockFilter() || this.outOfStockFilter()) {
+      return 'No products match the current stock filters.';
     }
 
     return 'No products found.';
@@ -515,6 +587,10 @@ export default class ProductsPage {
 
   protected availableClass(available: number): string {
     return available <= 0 ? 'text-red-300' : 'text-electric-cyan';
+  }
+
+  protected reorderPoint(product: Product): number {
+    return product.min_stock ?? LOW_STOCK_THRESHOLD;
   }
 
   private messageFor(error: unknown, fallback: string): string {

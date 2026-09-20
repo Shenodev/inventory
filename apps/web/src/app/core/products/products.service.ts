@@ -16,6 +16,7 @@ export interface Product {
   reserved_stock: number;
   sold_stock: number;
   available_stock: number;
+  min_stock?: number;
 }
 
 export interface ProductsResponse {

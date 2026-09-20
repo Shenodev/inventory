@@ -1,7 +1,11 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  HttpClient,
+  HttpInterceptorFn,
+} from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, throwError } from 'rxjs';
+import { catchError, finalize, Observable, share, switchMap, tap, throwError } from 'rxjs';
 
 import { API_BASE_URL } from '../api.base-url';
 import { AuthSessionStore } from './auth-session.store';
@@ -9,36 +13,100 @@ import { AuthSessionStore } from './auth-session.store';
 const isApiRequest = (url: string): boolean =>
   url.startsWith(API_BASE_URL) || url.startsWith('/');
 
-const isLoginRequest = (url: string): boolean => url.endsWith('/auth/login');
+const isAuthRequest = (url: string): boolean =>
+  url.endsWith('/auth/login') || url.endsWith('/auth/refresh');
+
+interface RefreshResponse {
+  access_token: string;
+}
+
+/**
+ * One refresh call at a time. If several requests get rejected with a 401 while
+ * a refresh is already in flight they all wait on the same exchange instead of
+ * hammering /auth/refresh with copies of the same token.
+ */
+let refreshInFlight: Observable<RefreshResponse> | null = null;
+
+const refreshAccessToken = (
+  http: HttpClient,
+  session: AuthSessionStore
+): Observable<RefreshResponse> => {
+  if (refreshInFlight === null) {
+    refreshInFlight = http
+      .post<RefreshResponse>(`${API_BASE_URL}/auth/refresh`, {
+        refresh_token: session.refreshToken(),
+      })
+      .pipe(
+        // Multicast so every request that got a 401 waits on the single
+        // in-flight exchange instead of each firing its own refresh call.
+        share(),
+        finalize(() => (refreshInFlight = null))
+      );
+  }
+
+  return refreshInFlight;
+};
+
+const endSession = (session: AuthSessionStore, router: Router): void => {
+  session.clear();
+
+  void router.navigate(['/login'], { queryParams: { session: 'expired' } });
+};
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const session = inject(AuthSessionStore);
   const router = inject(Router);
+  const http = inject(HttpClient);
   const token = session.token();
 
-  // Only attach the bearer token to our own API; never leak it to third parties.
+  // Only attach the bearer token to our own API; never leak it to third
+  // parties, and skip the auth endpoints themselves (login/refresh carry their
+  // own credentials and would only include a stale bearer).
   const authorised =
-    token !== null && isApiRequest(request.url)
+    token !== null && isApiRequest(request.url) && !isAuthRequest(request.url)
       ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
       : request;
 
   return next(authorised).pipe(
     catchError((error: unknown) => {
-      // A rejected token means the stored session is dead (expired, revoked or
-      // wiped on the server). Drop it and send the user to the sign-in page
-      // instead of leaving them on a page whose requests can only fail.
-      if (
+      const rejected =
         error instanceof HttpErrorResponse &&
         error.status === 401 &&
         isApiRequest(request.url) &&
-        !isLoginRequest(request.url)
-      ) {
-        session.clear();
+        !isAuthRequest(request.url);
 
-        void router.navigate(['/login'], { queryParams: { session: 'expired' } });
+      if (!rejected) {
+        return throwError(() => error);
       }
 
-      return throwError(() => error);
+      // No refresh token means the session is gone for good (never signed in,
+      // expired beyond its 7-day window, or revoked). Drop it and send the user
+      // to the sign-in page instead of leaving them on a page whose requests
+      // can only fail.
+      if (session.refreshToken() === null) {
+        endSession(session, router);
+
+        return throwError(() => error);
+      }
+
+      return refreshAccessToken(http, session).pipe(
+        tap((response) => session.setToken(response.access_token)),
+        // Retry the original request with the freshly issued access token.
+        switchMap((response) =>
+          next(
+            request.clone({
+              setHeaders: { Authorization: `Bearer ${response.access_token}` },
+            })
+          )
+        ),
+        // If the refresh itself is rejected (stale or revoked refresh token)
+        // the session is dead, so drop it and route back to sign-in.
+        catchError(() => {
+          endSession(session, router);
+
+          return throwError(() => error);
+        })
+      );
     })
   );
 };

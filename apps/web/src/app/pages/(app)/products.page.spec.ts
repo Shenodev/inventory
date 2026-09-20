@@ -24,6 +24,40 @@ const PRODUCT = {
   available_stock: 100,
 };
 
+const LOW_STOCK_PRODUCT = {
+  id: 2,
+  sku: 'SKU-002',
+  name: 'Low Stock Widget',
+  price: '9.99',
+  total_stock: 8,
+  reserved_stock: 3,
+  sold_stock: 0,
+  available_stock: 5,
+};
+
+const REORDER_PRODUCT = {
+  id: 3,
+  sku: 'SKU-003',
+  name: 'Reorder Widget',
+  price: '14.99',
+  total_stock: 30,
+  reserved_stock: 15,
+  sold_stock: 0,
+  available_stock: 15,
+  min_stock: 20,
+};
+
+const SOLD_OUT_PRODUCT = {
+  id: 4,
+  sku: 'SKU-004',
+  name: 'Sold Out Widget',
+  price: '4.99',
+  total_stock: 0,
+  reserved_stock: 0,
+  sold_stock: 0,
+  available_stock: 0,
+};
+
 describe('ProductsPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -36,7 +70,10 @@ describe('ProductsPage', () => {
         {
           provide: ProductsService,
           useValue: {
-            list: () => of({ products: [PRODUCT] }),
+            list: () =>
+              of({
+                products: [PRODUCT, LOW_STOCK_PRODUCT, REORDER_PRODUCT, SOLD_OUT_PRODUCT],
+              }),
             adjustStock: () =>
               of({
                 message: 'Stock updated.',
@@ -81,5 +118,53 @@ describe('ProductsPage', () => {
 
     expect(dialog).toBeTruthy();
     expect(dialog?.className).toContain('rounded-xl');
+  });
+
+  it('filters the table by the Low Stock and Out of Stock toggles', () => {
+    const fixture = TestBed.createComponent(ProductsPage);
+    (fixture.componentInstance as unknown as ProductsPageInternals).load();
+    fixture.detectChanges();
+
+    const native = fixture.nativeElement as HTMLElement;
+
+    const buttonFor = (label: string) =>
+      Array.from(native.querySelectorAll('button')).find((element) =>
+        element.textContent?.includes(label)
+      );
+
+    const lowButton = buttonFor('Low Stock');
+
+    expect(lowButton).toBeTruthy();
+
+    lowButton?.click();
+    fixture.detectChanges();
+
+    expect(native.textContent).toContain('Low Stock Widget');
+    expect(native.textContent).toContain('Reorder Widget');
+    expect(native.textContent).not.toContain('Demo Widget');
+    expect(native.textContent).not.toContain('Sold Out Widget');
+
+    const outButton = buttonFor('Out of Stock');
+
+    expect(outButton).toBeTruthy();
+    outButton?.click();
+    fixture.detectChanges();
+
+    expect(native.textContent).toContain('Low Stock Widget');
+    expect(native.textContent).toContain('Reorder Widget');
+    expect(native.textContent).toContain('Sold Out Widget');
+    expect(native.textContent).not.toContain('Demo Widget');
+
+    lowButton?.click();
+    fixture.detectChanges();
+
+    expect(native.textContent).toContain('Sold Out Widget');
+    expect(native.textContent).not.toContain('Demo Widget');
+    expect(native.textContent).not.toContain('Low Stock Widget');
+
+    outButton?.click();
+    fixture.detectChanges();
+
+    expect(native.textContent).toContain('Demo Widget');
   });
 });
