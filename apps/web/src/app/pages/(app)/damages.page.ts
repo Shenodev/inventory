@@ -53,13 +53,13 @@ export const routeMeta: RouteMeta = {
     <section class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Damages recorded</p>
-        <p class="mt-2 font-heading text-2xl font-semibold text-white">{{ formatNumber(damages().length) }}</p>
-        <p class="mt-1 text-xs text-slate-500">Individual write-offs</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-white">{{ formatNumber(filteredDamages().length) }}</p>
+        <p class="mt-1 text-xs text-slate-500">Individual write-offs ({{ formatNumber(damages().length) }} total)</p>
       </article>
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Units written off</p>
         <p class="mt-2 font-heading text-2xl font-semibold text-red-300">{{ totalUnitsLost() }}</p>
-        <p class="mt-1 text-xs text-slate-500">Damaged units removed</p>
+        <p class="mt-1 text-xs text-slate-500">Filtered total</p>
       </article>
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Total loss</p>
@@ -67,6 +67,39 @@ export const routeMeta: RouteMeta = {
         <p class="mt-1 text-xs text-slate-500">Valued at product cost</p>
       </article>
     </section>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <label class="relative flex min-w-0 flex-1 items-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="pointer-events-none absolute left-3 h-4 w-4 text-slate-500">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Search by product, SKU or reason…"
+          [value]="query()"
+          (input)="onQuery($event)"
+          class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+        />
+        @if (query() !== '') {
+          <button type="button" (click)="query.set('')" aria-label="Clear search" class="absolute right-2 rounded-lg p-1 text-slate-400 transition-colors hover:text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        }
+      </label>
+      <span class="text-sm text-slate-500">{{ filteredDamages().length }} of {{ damages().length }}</span>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-3">
+      <div class="flex gap-2">
+        <label class="text-xs text-slate-500">From</label>
+        <input type="date" [value]="dateFrom()" (change)="onDateFrom($event)" class="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs text-white outline-none focus:border-electric-cyan" />
+        <label class="text-xs text-slate-500">To</label>
+        <input type="date" [value]="dateTo()" (change)="onDateTo($event)" class="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs text-white outline-none focus:border-electric-cyan" />
+        @if (dateFrom() || dateTo()) {
+          <button type="button" (click)="clearDates()" class="rounded-xl border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:text-white">Clear dates</button>
+        }
+      </div>
+    </div>
 
     <section class="mt-6 overflow-hidden rounded-xl bg-surface">
       <div class="overflow-x-auto">
@@ -81,7 +114,7 @@ export const routeMeta: RouteMeta = {
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
-            @for (entry of damages(); track entry.id ?? entry.product_id) {
+            @for (entry of filteredDamages(); track entry.id ?? entry.product_id) {
               <tr class="transition-colors hover:bg-deep-slate/60">
                 <td class="px-6 py-4">
                   <p class="font-medium text-white">{{ entry.name }}</p>
@@ -95,7 +128,7 @@ export const routeMeta: RouteMeta = {
             } @empty {
               <tr>
                 <td colspan="5" class="px-6 py-10 text-center text-slate-500">
-                  {{ loading() ? 'Loading damages…' : 'No damages written off yet.' }}
+                  {{ loading() ? 'Loading damages…' : (query() || dateFrom() || dateTo() ? 'No damages match your filters.' : 'No damages written off yet.') }}
                 </td>
               </tr>
             }
@@ -112,12 +145,36 @@ export default class DamagesPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
+  protected readonly query = signal('');
+  protected readonly dateFrom = signal('');
+  protected readonly dateTo = signal('');
+
+  protected readonly filteredDamages = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+    const from = this.dateFrom() ? new Date(this.dateFrom()) : null;
+    const to = this.dateTo() ? new Date(this.dateTo()) : null;
+    if (to) to.setHours(23, 59, 59, 999);
+    return this.damages().filter((entry) => {
+      if (needle) {
+        const hay = `${entry.name ?? ''} ${entry.sku ?? ''} ${entry.reason ?? ''}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (from || to) {
+        if (!entry.created_at) return false;
+        const d = new Date(entry.created_at);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+      }
+      return true;
+    });
+  });
+
   protected readonly totalUnitsLost = computed(() =>
-    formatNumber(this.damages().reduce((sum, entry) => sum + entry.quantity, 0))
+    formatNumber(this.filteredDamages().reduce((sum, entry) => sum + entry.quantity, 0))
   );
 
   protected readonly totalLoss = computed(() => {
-    const entries = this.damages();
+    const entries = this.filteredDamages();
     if (entries.length === 0) {
       return '—';
     }
@@ -126,6 +183,20 @@ export default class DamagesPage {
 
   constructor() {
     afterNextRender(() => this.load());
+  }
+
+  protected onQuery(event: Event): void {
+    this.query.set((event.target as HTMLInputElement).value);
+  }
+  protected onDateFrom(event: Event): void {
+    this.dateFrom.set((event.target as HTMLInputElement).value);
+  }
+  protected onDateTo(event: Event): void {
+    this.dateTo.set((event.target as HTMLInputElement).value);
+  }
+  protected clearDates(): void {
+    this.dateFrom.set('');
+    this.dateTo.set('');
   }
 
   protected load(force = false): void {

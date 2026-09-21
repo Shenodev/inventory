@@ -40,6 +40,8 @@ class Product extends Model
         'price',
         'cost',
         'total_stock',
+        'location',
+        'barcode',
     ];
 
     /**

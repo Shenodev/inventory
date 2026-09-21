@@ -63,7 +63,7 @@ class InventoryService
     }
 
     /**
-     * @return array<string, int|string>
+     * @return array<string, int|string|null>
      */
     public function present(Product $product): array
     {
@@ -75,10 +75,13 @@ class InventoryService
             'sku' => $product->sku,
             'name' => $product->name,
             'price' => $product->price,
+            'cost' => $product->cost,
             'total_stock' => $product->total_stock,
             'reserved_stock' => $reserved,
             'sold_stock' => $sold,
             'available_stock' => $product->total_stock - $reserved - $sold,
+            'location' => $product->location,
+            'barcode' => $product->barcode,
         ];
     }
 

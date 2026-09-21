@@ -23,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/dashboard', DashboardController::class);
 
     Route::get('/products', [ProductController::class, 'index']);
+    Route::get('/products/lookup', [ProductController::class, 'lookup']);
+    Route::patch('/products/{product}', [ProductController::class, 'update']);
+    Route::put('/products/{product}', [ProductController::class, 'update']);
     Route::post('/products/{product}/stock', [ProductController::class, 'adjustStock']);
 
     Route::get('/orders/reserved', [OrderController::class, 'reserved']);

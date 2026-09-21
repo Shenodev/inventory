@@ -25,6 +25,8 @@ const referenceLabels: Record<string, string> = {
   Product: 'Product',
 };
 
+type TxFilter = 'all' | 'income' | 'expense';
+
 @Component({
   selector: 'app-transactions-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,7 +35,7 @@ const referenceLabels: Record<string, string> = {
       <div>
         <h1 class="font-heading text-2xl font-semibold text-white">Transactions</h1>
         <p class="mt-1 text-sm text-slate-400">
-          {{ transactions().length }} financial movements recorded.
+          {{ filteredTransactions().length }} of {{ transactions().length }} financial movements.
         </p>
       </div>
       <button
@@ -63,21 +65,56 @@ const referenceLabels: Record<string, string> = {
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Income</p>
         <p class="mt-2 font-heading text-2xl font-semibold text-electric-cyan">{{ totalIncome() }}</p>
-        <p class="mt-1 text-xs text-slate-500">Sum of income entries</p>
+        <p class="mt-1 text-xs text-slate-500">Filtered income</p>
       </article>
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Expenses</p>
         <p class="mt-2 font-heading text-2xl font-semibold text-red-300">{{ totalExpenses() }}</p>
-        <p class="mt-1 text-xs text-slate-500">Sum of expense entries</p>
+        <p class="mt-1 text-xs text-slate-500">Filtered expenses</p>
       </article>
       <article class="rounded-xl bg-surface p-6">
         <p class="text-sm font-medium text-slate-400">Net balance</p>
         <p class="mt-2 font-heading text-2xl font-semibold" [class]="netBalanceClass()">
           {{ netBalance() }}
         </p>
-        <p class="mt-1 text-xs text-slate-500">Income minus expenses</p>
+        <p class="mt-1 text-xs text-slate-500">Income minus expenses (filtered)</p>
       </article>
     </section>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <label class="relative flex min-w-0 flex-1 items-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="pointer-events-none absolute left-3 h-4 w-4 text-slate-500">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Search by amount, reference or type…"
+          [value]="query()"
+          (input)="onQuery($event)"
+          class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+        />
+        @if (query() !== '') {
+          <button type="button" (click)="query.set('')" aria-label="Clear search" class="absolute right-2 rounded-lg p-1 text-slate-400 transition-colors hover:text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        }
+      </label>
+      <span class="text-sm text-slate-500">{{ filteredTransactions().length }} of {{ transactions().length }}</span>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <button type="button" (click)="setType('all')" [class]="typeChip('all')">All</button>
+      <button type="button" (click)="setType('income')" [class]="typeChip('income')">Income</button>
+      <button type="button" (click)="setType('expense')" [class]="typeChip('expense')">Expense</button>
+      <span class="mx-2 h-6 w-px bg-white/10"></span>
+      <label class="text-xs text-slate-500">From</label>
+      <input type="date" [value]="dateFrom()" (change)="onDateFrom($event)" class="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs text-white outline-none focus:border-electric-cyan" />
+      <label class="text-xs text-slate-500">To</label>
+      <input type="date" [value]="dateTo()" (change)="onDateTo($event)" class="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs text-white outline-none focus:border-electric-cyan" />
+      @if (dateFrom() || dateTo()) {
+        <button type="button" (click)="clearDates()" class="rounded-xl border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:text-white">Clear dates</button>
+      }
+    </div>
 
     <section class="mt-6 overflow-hidden rounded-xl bg-surface">
       <div class="overflow-x-auto">
@@ -91,7 +128,7 @@ const referenceLabels: Record<string, string> = {
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
-            @for (entry of transactions(); track entry.id) {
+            @for (entry of filteredTransactions(); track entry.id) {
               <tr class="transition-colors hover:bg-deep-slate/60">
                 <td class="px-6 py-4">
                   <span
@@ -121,7 +158,7 @@ const referenceLabels: Record<string, string> = {
             } @empty {
               <tr>
                 <td colspan="4" class="px-6 py-10 text-center text-slate-500">
-                  {{ loading() ? 'Loading transactions…' : 'No transactions recorded yet.' }}
+                  {{ loading() ? 'Loading transactions…' : (query() || type() !== 'all' || dateFrom() || dateTo() ? 'No transactions match your filters.' : 'No transactions recorded yet.') }}
                 </td>
               </tr>
             }
@@ -138,8 +175,36 @@ export default class TransactionsPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
+  protected readonly query = signal('');
+  protected readonly type = signal<TxFilter>('all');
+  protected readonly dateFrom = signal('');
+  protected readonly dateTo = signal('');
+
+  protected readonly filteredTransactions = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+    const t = this.type();
+    const from = this.dateFrom() ? new Date(this.dateFrom()) : null;
+    const to = this.dateTo() ? new Date(this.dateTo()) : null;
+    if (to) to.setHours(23, 59, 59, 999);
+    return this.transactions().filter((entry) => {
+      if (t !== 'all' && entry.type !== t) return false;
+      if (needle) {
+        const ref = this.referenceLabel(entry).toLowerCase();
+        const hay = `${entry.type} ${entry.amount} ${ref}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (from || to) {
+        if (!entry.created_at) return false;
+        const d = new Date(entry.created_at);
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+      }
+      return true;
+    });
+  });
+
   protected readonly totalIncome = computed(() => {
-    const entries = this.transactions();
+    const entries = this.filteredTransactions();
     const total = entries
       .filter((entry) => entry.type === 'income')
       .reduce((sum, entry) => sum + Number(entry.amount), 0);
@@ -147,7 +212,7 @@ export default class TransactionsPage {
   });
 
   protected readonly totalExpenses = computed(() => {
-    const entries = this.transactions();
+    const entries = this.filteredTransactions();
     const total = entries
       .filter((entry) => entry.type === 'expense')
       .reduce((sum, entry) => sum + Number(entry.amount), 0);
@@ -155,7 +220,7 @@ export default class TransactionsPage {
   });
 
   protected readonly netBalance = computed(() => {
-    const entries = this.transactions();
+    const entries = this.filteredTransactions();
     if (entries.length === 0) {
       return '—';
     }
@@ -169,7 +234,7 @@ export default class TransactionsPage {
   });
 
   protected readonly netBalanceClass = computed(() => {
-    const entries = this.transactions();
+    const entries = this.filteredTransactions();
     let balance = 0;
     for (const entry of entries) {
       balance += entry.type === 'income' ? Number(entry.amount) : -Number(entry.amount);
@@ -179,6 +244,19 @@ export default class TransactionsPage {
 
   constructor() {
     afterNextRender(() => this.load());
+  }
+
+  protected onQuery(event: Event): void { this.query.set((event.target as HTMLInputElement).value); }
+  protected setType(v: TxFilter): void { this.type.set(v); }
+  protected onDateFrom(event: Event): void { this.dateFrom.set((event.target as HTMLInputElement).value); }
+  protected onDateTo(event: Event): void { this.dateTo.set((event.target as HTMLInputElement).value); }
+  protected clearDates(): void { this.dateFrom.set(''); this.dateTo.set(''); }
+
+  protected typeChip(t: TxFilter): string {
+    const active = this.type() === t;
+    return active
+      ? 'rounded-xl border border-electric-cyan/40 bg-electric-cyan/10 px-4 py-2 text-xs font-medium text-electric-cyan'
+      : 'rounded-xl border border-white/10 bg-surface px-4 py-2 text-xs font-medium text-slate-400 hover:text-white';
   }
 
   protected load(force = false): void {

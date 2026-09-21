@@ -20,6 +20,7 @@ import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatNumber } from '../../core/format';
 import { Product, ProductsService } from '../../core/products/products.service';
+import { BarcodeScannerComponent } from '../../shared/barcode-scanner.component';
 
 export const routeMeta: RouteMeta = {
   title: 'Products · ShenoInventory',
@@ -32,7 +33,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
 
 @Component({
   selector: 'app-products-page',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, BarcodeScannerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
@@ -129,6 +130,17 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
       </article>
     </section>
 
+    <section class="mt-6 rounded-xl border border-white/5 bg-surface p-4">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Barcode quick scan</p>
+      <p class="mt-1 text-xs text-slate-500">Scan a barcode with a handheld scanner (keyboard wedge) or camera — it will filter to the matching product. Supports barcode, SKU, name or location search.</p>
+      <div class="mt-3">
+        <app-barcode-scanner placeholder="Scan barcode or enter SKU / barcode…" (productFound)="onBarcodeFound($event)" (scanFailed)="onBarcodeFailed($event)" />
+      </div>
+      @if (barcodeNotice(); as bmsg) {
+        <p class="mt-2 text-xs" [class]="barcodeIsError() ? 'text-amber-300' : 'text-emerald-300'">{{ bmsg }}</p>
+      }
+    </section>
+
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <label class="relative flex min-w-0 flex-1 items-center">
         <svg
@@ -143,7 +155,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
         </svg>
         <input
           type="search"
-          placeholder="Search by name or SKU…"
+          placeholder="Search by name, SKU, barcode or location…"
           [value]="query()"
           (input)="onQuery($event)"
           class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
@@ -199,6 +211,8 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
           >
             <tr>
               <th scope="col" class="px-6 py-3 font-medium">Product</th>
+              <th scope="col" class="px-6 py-3 font-medium">Location</th>
+              <th scope="col" class="px-6 py-3 font-medium">Barcode</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Total Stock</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Reserved</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Sold</th>
@@ -215,6 +229,15 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                   <p class="mt-0.5 text-xs text-slate-500">
                     <span class="font-mono">{{ product.sku }}</span> · {{ price(product.price) }}
                   </p>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="inline-flex items-center gap-1 text-xs font-medium text-slate-300">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5 text-slate-500"><path d="M12 21s-6-5.2-6-9a6 6 0 1 1 12 0c0 3.8-6 9-6 9Z"/><circle cx="12" cy="12" r="2"/></svg>
+                    {{ product.location ?? '—' }}
+                  </span>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="font-mono text-xs text-slate-300">{{ product.barcode ?? '—' }}</span>
                 </td>
                 <td class="px-6 py-4 text-center font-medium text-white">
                   {{ product.total_stock }}
@@ -238,18 +261,27 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                   </span>
                 </td>
                 <td class="px-6 py-4 text-right">
-                  <button
-                    type="button"
-                    (click)="openAdjust(product)"
-                    class="rounded-xl border border-white/10 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
-                  >
-                    Adjust Stock
-                  </button>
+                  <div class="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      (click)="openLocationEdit(product)"
+                      class="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
+                    >
+                      Location
+                    </button>
+                    <button
+                      type="button"
+                      (click)="openAdjust(product)"
+                      class="rounded-xl border border-white/10 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
+                    >
+                      Adjust Stock
+                    </button>
+                  </div>
                 </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="7" class="px-6 py-10 text-center text-slate-500">
+                <td colspan="9" class="px-6 py-10 text-center text-slate-500">
                   {{ emptyLabel() }}
                 </td>
               </tr>
@@ -271,6 +303,92 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
       </div>
     }
 
+    @if (locationProduct(); as product) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
+        (click)="closeLocationEdit()"
+      >
+        <div
+          class="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6 text-left"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-location-title"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="edit-location-title" class="font-heading text-lg font-semibold text-white">
+                Edit location & barcode
+              </h2>
+              <p class="mt-1 text-sm text-slate-400">{{ product.name }} · {{ product.sku }}</p>
+            </div>
+            <button
+              type="button"
+              (click)="closeLocationEdit()"
+              aria-label="Close dialog"
+              class="rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-deep-slate hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+
+          <form class="mt-5" [formGroup]="locationForm" (ngSubmit)="submitLocation()">
+            <label class="block text-sm font-medium text-slate-300" for="edit-location">
+              Physical location
+            </label>
+            <input
+              id="edit-location"
+              type="text"
+              formControlName="location"
+              placeholder="e.g. Aisle 4, Shelf B"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+            />
+            <p class="mt-1 text-xs text-slate-500">Exactly where the item is stored. Workers use this to pick.</p>
+
+            <label class="mt-4 block text-sm font-medium text-slate-300" for="edit-barcode">
+              Barcode
+            </label>
+            <input
+              id="edit-barcode"
+              type="text"
+              formControlName="barcode"
+              placeholder="e.g. 5901234123457"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 font-mono text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+            />
+
+            @if (formError(); as message) {
+              <p
+                class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                role="alert"
+              >
+                {{ message }}
+              </p>
+            }
+
+            <div class="mt-6 flex gap-3">
+              <button
+                type="button"
+                (click)="closeLocationEdit()"
+                [disabled]="savingLocation()"
+                class="flex-1 rounded-xl border border-white/10 px-4 py-3 font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                [disabled]="savingLocation()"
+                class="flex-1 rounded-xl bg-electric-cyan px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {{ savingLocation() ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
+
     @if (activeProduct(); as product) {
       <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
@@ -289,6 +407,9 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                 Adjust stock
               </h2>
               <p class="mt-1 text-sm text-slate-400">{{ product.name }}</p>
+              @if (product.location) {
+                <p class="mt-1 text-xs text-slate-500">📍 {{ product.location }} · <span class="font-mono">{{ product.barcode ?? product.sku }}</span></p>
+              }
             </div>
             <button
               type="button"
@@ -400,7 +521,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                 Report damage
               </h2>
               <p class="mt-1 text-sm text-slate-400">
-                Write off broken or unusable stock.
+                Write off broken or unusable stock. Scan barcode or select product.
               </p>
             </div>
             <button
@@ -414,6 +535,10 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>
             </button>
+          </div>
+
+          <div class="mt-4">
+            <app-barcode-scanner placeholder="Scan damaged item barcode…" (productFound)="onDamageBarcode($event)" />
           </div>
 
           <form class="mt-5" [formGroup]="damageForm" (ngSubmit)="submitDamage()">
@@ -430,7 +555,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
               <option [ngValue]="null" disabled>Select a product…</option>
               @for (product of products(); track product.id) {
                 <option [ngValue]="product.id">
-                  {{ product.name }} ({{ product.sku }}) — {{ product.available_stock }} available
+                  {{ product.name }} ({{ product.sku }}) · {{ product.barcode ?? 'no barcode' }} — {{ product.available_stock }} available · {{ product.location ?? 'no location' }}
                 </option>
               }
             </select>
@@ -523,6 +648,16 @@ export default class ProductsPage {
   protected readonly damageOpen = signal(false);
   protected readonly damaging = signal(false);
 
+  protected readonly barcodeNotice = signal<string | null>(null);
+  protected readonly barcodeIsError = signal(false);
+
+  protected readonly locationProduct = signal<Product | null>(null);
+  protected readonly savingLocation = signal(false);
+  protected readonly locationForm = this.formBuilder.group({
+    location: this.formBuilder.control('', [Validators.maxLength(100)]),
+    barcode: this.formBuilder.control('', [Validators.maxLength(50)]),
+  });
+
   protected readonly damageForm = this.formBuilder.group(
     {
       productId: this.formBuilder.control<number | null>(null, Validators.required),
@@ -545,7 +680,9 @@ export default class ProductsPage {
       const matchesQuery =
         needle === '' ||
         product.name.toLowerCase().includes(needle) ||
-        product.sku.toLowerCase().includes(needle);
+        product.sku.toLowerCase().includes(needle) ||
+        (product.barcode ?? '').toLowerCase().includes(needle) ||
+        (product.location ?? '').toLowerCase().includes(needle);
 
       if (!matchesQuery) {
         return false;
@@ -608,6 +745,10 @@ export default class ProductsPage {
 
     if (this.damageOpen()) {
       this.closeDamage();
+    }
+
+    if (this.locationProduct() !== null) {
+      this.closeLocationEdit();
     }
   }
 
@@ -686,6 +827,69 @@ export default class ProductsPage {
     }
 
     return 'No products found.';
+  }
+
+  protected onBarcodeFound(product: Product): void {
+    this.query.set(product.barcode ?? product.sku);
+    this.limit.set(PAGE_SIZE);
+    this.barcodeNotice.set(`Scanned: ${product.name} — ${product.location ?? 'no location'} (barcode ${product.barcode ?? '—'})`);
+    this.barcodeIsError.set(false);
+    // ensure product is in list (in case lookup returned single); merge if needed
+    if (!this.products().some((p) => p.id === product.id)) {
+      this.products.update((list) => [...list, product]);
+    }
+  }
+
+  protected onBarcodeFailed(code: string): void {
+    // fallback to filtering by typed code
+    this.query.set(code);
+    this.barcodeNotice.set(`No exact barcode match for "${code}" — showing search results.`);
+    this.barcodeIsError.set(true);
+  }
+
+  protected onDamageBarcode(product: Product): void {
+    this.damageForm.controls.productId.setValue(product.id);
+    this.damageForm.controls.quantity.updateValueAndValidity();
+    this.notice.set(`Scanned ${product.name} for damage report.`);
+  }
+
+  protected openLocationEdit(product: Product): void {
+    this.locationForm.setValue({
+      location: product.location ?? '',
+      barcode: product.barcode ?? '',
+    });
+    this.formError.set(null);
+    this.locationProduct.set(product);
+  }
+
+  protected closeLocationEdit(): void {
+    if (this.savingLocation()) return;
+    this.locationProduct.set(null);
+  }
+
+  protected submitLocation(): void {
+    const product = this.locationProduct();
+    if (product === null || this.savingLocation()) return;
+
+    const { location, barcode } = this.locationForm.getRawValue();
+    this.savingLocation.set(true);
+    this.formError.set(null);
+
+    this.productsService.updateProduct(product.id, {
+      location: location.trim() || null,
+      barcode: barcode.trim() || null,
+    }).subscribe({
+      next: ({ product: updated }) => {
+        this.products.update((list) => list.map((p) => p.id === updated.id ? updated : p));
+        this.savingLocation.set(false);
+        this.locationProduct.set(null);
+        this.notice.set(`${updated.name} location updated to ${updated.location ?? '—'}.`);
+      },
+      error: (error: unknown) => {
+        this.savingLocation.set(false);
+        this.formError.set(this.messageFor(error, 'Unable to update location/barcode.'));
+      },
+    });
   }
 
   protected openAdjust(product: Product): void {

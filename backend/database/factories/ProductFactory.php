@@ -23,6 +23,8 @@ class ProductFactory extends Factory
             'price' => fake()->randomFloat(2, 5, 500),
             'cost' => fake()->randomFloat(2, 3, 200),
             'total_stock' => fake()->numberBetween(0, 500),
+            'location' => 'Aisle '.fake()->randomElement(['A', 'B', 'C', 'D']).', Bay '.fake()->numberBetween(1, 12).', Shelf '.fake()->randomElement(['A', 'B', 'C', 'D']),
+            'barcode' => fake()->unique()->ean13(),
         ];
     }
 }

@@ -12,11 +12,14 @@ export interface Product {
   sku: string;
   name: string;
   price: string;
+  cost?: string;
   total_stock: number;
   reserved_stock: number;
   sold_stock: number;
   available_stock: number;
   min_stock?: number;
+  location?: string | null;
+  barcode?: string | null;
 }
 
 export interface ProductsResponse {
@@ -74,10 +77,28 @@ export interface ReportDamageResponse {
 export class ProductsService {
   private readonly http = inject(HttpClient);
 
-  list(force = false): Observable<ProductsResponse> {
+  list(force = false, query?: string): Observable<ProductsResponse> {
+    const params: Record<string, string> = {};
+    if (query?.trim()) {
+      params['q'] = query.trim();
+    }
     return this.http.get<ProductsResponse>(`${API_BASE_URL}/products`, {
+      params,
       context: new HttpContext().set(BYPASS_CACHE, force),
     });
+  }
+
+  lookupByBarcode(barcode: string): Observable<{ product: Product }> {
+    return this.http.get<{ product: Product }>(`${API_BASE_URL}/products/lookup`, {
+      params: { barcode: barcode.trim() },
+    });
+  }
+
+  updateProduct(productId: number, payload: { location?: string | null; barcode?: string | null }): Observable<{ message: string; product: Product }> {
+    return this.http.patch<{ message: string; product: Product }>(
+      `${API_BASE_URL}/products/${productId}`,
+      payload
+    );
   }
 
   adjustStock(productId: number, payload: AdjustStockPayload): Observable<AdjustStockResponse> {

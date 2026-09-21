@@ -27,6 +27,7 @@ import {
   PurchaseOrderStatus,
 } from '../../core/procurement/purchase-orders.service';
 import { SuppliersService, Supplier } from '../../core/procurement/suppliers.service';
+import { BarcodeScannerComponent } from '../../shared/barcode-scanner.component';
 
 export const routeMeta: RouteMeta = {
   title: 'Purchase Orders · ShenoInventory',
@@ -44,7 +45,7 @@ const QUANTITY_PATTERN = /^\d+(\.\d{1,2})?$/;
 
 @Component({
   selector: 'app-purchase-orders-page',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, BarcodeScannerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
@@ -165,6 +166,27 @@ const QUANTITY_PATTERN = /^\d+(\.\d{1,2})?$/;
           <span class="ml-1 text-xs opacity-70">({{ receivedCount() }})</span>
         }
       </button>
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <label class="relative flex min-w-0 flex-1 items-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="pointer-events-none absolute left-3 h-4 w-4 text-slate-500">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" />
+        </svg>
+        <input
+          type="search"
+          placeholder="Search by order #, supplier or total…"
+          [value]="query()"
+          (input)="onQuery($event)"
+          class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+        />
+        @if (query() !== '') {
+          <button type="button" (click)="query.set('')" aria-label="Clear search" class="absolute right-2 rounded-lg p-1 text-slate-400 transition-colors hover:text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        }
+      </label>
+      <span class="text-sm text-slate-500">{{ visibleOrders().length }} of {{ baseFiltered().length }}</span>
     </div>
 
     <div class="mt-4 grid gap-6 lg:grid-cols-2">
@@ -363,11 +385,22 @@ const QUANTITY_PATTERN = /^\d+(\.\d{1,2})?$/;
                 </button>
               </div>
 
+              <div class="mt-4 rounded-xl border border-white/5 bg-deep-slate/40 p-3">
+                <p class="text-xs font-medium text-slate-300">Scan barcode to add product</p>
+                <p class="mt-1 text-xs text-slate-500">Use a handheld scanner or camera — scanned product is added as a new line automatically.</p>
+                <div class="mt-2">
+                  <app-barcode-scanner placeholder="Scan product barcode…" (productFound)="onScannedProduct($event)" (scanFailed)="onScanFailed($event)" />
+                </div>
+                @if (scanNotice(); as msg) {
+                  <p class="mt-2 text-xs" [class]="scanIsError() ? 'text-amber-300' : 'text-emerald-300'">{{ msg }}</p>
+                }
+              </div>
+
               @if (itemLines.controls.length === 0) {
                 <p
                   class="mt-4 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-slate-500"
                 >
-                  No line items yet — click “Add line” to start entering items.
+                  No line items yet — click “Add line” or scan a barcode to start entering items.
                 </p>
               } @else {
                 <div formArrayName="items" class="mt-4 space-y-3">
@@ -390,7 +423,7 @@ const QUANTITY_PATTERN = /^\d+(\.\d{1,2})?$/;
                           <option [ngValue]="null" disabled>Select a product…</option>
                           @for (product of products(); track product.id) {
                             <option [ngValue]="product.id">
-                              {{ product.name }} ({{ product.sku }})
+                              {{ product.name }} ({{ product.sku }}) · {{ product.barcode ?? '—' }} · {{ product.location ?? '—' }}
                             </option>
                           }
                         </select>
@@ -616,6 +649,9 @@ export default class PurchaseOrdersPage {
   protected readonly notice = signal<string | null>(null);
 
   protected readonly tab = signal<Tab>('all');
+  protected readonly query = signal('');
+  protected readonly scanNotice = signal<string | null>(null);
+  protected readonly scanIsError = signal(false);
 
   protected readonly selectedId = signal<number | null>(null);
   protected readonly detail = signal<PurchaseOrder | null>(null);
@@ -642,14 +678,20 @@ export default class PurchaseOrdersPage {
     supplierId: this.formBuilder.control<number | null>(null, Validators.required),
   });
 
-  protected readonly visibleOrders = computed(() => {
+  protected readonly baseFiltered = computed(() => {
     const current = this.tab();
-
-    if (current === 'all') {
-      return this.purchaseOrders();
-    }
-
+    if (current === 'all') return this.purchaseOrders();
     return this.purchaseOrders().filter((order) => order.status === current);
+  });
+
+  protected readonly visibleOrders = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+    const list = this.baseFiltered();
+    if (!needle) return list;
+    return list.filter((order) => {
+      const hay = `#${order.id} ${order.supplier ?? ''} ${order.total_cost} ${order.status}`.toLowerCase();
+      return hay.includes(needle);
+    });
   });
 
   protected readonly pendingCount = computed(() =>
@@ -684,6 +726,37 @@ export default class PurchaseOrdersPage {
   protected onEscape(): void {
     this.cancelReceive();
     this.closeCreate();
+  }
+
+  protected onQuery(event: Event): void {
+    this.query.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onScannedProduct(product: Product): void {
+    if (this.detail()?.status !== 'pending') {
+      this.scanNotice.set('Select a pending order first.');
+      this.scanIsError.set(true);
+      return;
+    }
+    // Avoid duplicate
+    const exists = this.itemLines.controls.some((c) => c.controls.productId.value === product.id);
+    if (exists) {
+      this.scanNotice.set(`${product.name} is already on this purchase order.`);
+      this.scanIsError.set(true);
+      return;
+    }
+    const line = this.createItemLine();
+    line.controls.productId.setValue(product.id);
+    line.controls.unitCost.setValue(product.price);
+    line.controls.quantity.setValue(1);
+    this.itemLines.push(line);
+    this.scanNotice.set(`Scanned ${product.name} — added to lines. Adjust qty/cost then click Add items.`);
+    this.scanIsError.set(false);
+  }
+
+  protected onScanFailed(code: string): void {
+    this.scanNotice.set(`No product found for "${code}".`);
+    this.scanIsError.set(true);
   }
 
   protected load(force = false): void {
@@ -722,6 +795,7 @@ export default class PurchaseOrdersPage {
     this.detailLoading.set(true);
     this.detailError.set(null);
     this.formError.set(null);
+    this.scanNotice.set(null);
 
     this.purchaseOrdersService.show(id).subscribe({
       next: ({ purchase_order }) => {
@@ -975,6 +1049,10 @@ export default class PurchaseOrdersPage {
   protected emptyLabel(): string {
     if (this.loading()) {
       return 'Loading purchase orders…';
+    }
+
+    if (this.query().trim() !== '') {
+      return `No purchase orders matching "${this.query().trim()}"`;
     }
 
     if (this.tab() !== 'all') {
