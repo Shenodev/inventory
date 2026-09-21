@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Enums\UserRole;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -24,6 +25,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
     ];
 
     /**
@@ -31,11 +33,6 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
-
     /**
      * Get the attributes that should be cast.
      *
@@ -45,7 +42,24 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'role' => UserRole::class,
         ];
+    }
+
+    public function isAdmin(): bool
+    {
+        return ($this->role ?? UserRole::Operator) === UserRole::Admin;
+    }
+
+    public function isManager(): bool
+    {
+        return in_array($this->role ?? UserRole::Operator, [UserRole::Admin, UserRole::Manager], true);
+    }
+
+    public function hasRole(UserRole ...$roles): bool
+    {
+        return in_array($this->role ?? UserRole::Operator, $roles, true);
     }
 }

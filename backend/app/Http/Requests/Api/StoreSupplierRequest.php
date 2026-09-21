@@ -20,9 +20,9 @@ class StoreSupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', 'not_regex:/<[^>]*>/'],
             'email' => ['nullable', 'email', 'max:255', Rule::unique('suppliers', 'email')],
-            'phone' => ['nullable', 'string', 'max:40'],
+            'phone' => ['nullable', 'string', 'max:40', 'regex:/^[+\d\s\-()]+$/'],
         ];
     }
 }

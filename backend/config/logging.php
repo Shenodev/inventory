@@ -63,6 +63,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'processors' => [\App\Logging\RedactSensitiveProcessor::class, PsrLogMessageProcessor::class],
         ],
 
         'daily' => [
@@ -102,7 +103,7 @@ return [
             'with' => [
                 'stream' => 'php://stderr',
             ],
-            'processors' => [PsrLogMessageProcessor::class],
+            'processors' => [\App\Logging\RedactSensitiveProcessor::class, PsrLogMessageProcessor::class],
         ],
 
         'syslog' => [

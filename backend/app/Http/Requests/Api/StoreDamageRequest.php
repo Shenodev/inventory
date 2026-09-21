@@ -21,7 +21,7 @@ class StoreDamageRequest extends FormRequest
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'reason' => ['nullable', 'string', 'max:500'],
+            'reason' => ['nullable', 'string', 'max:500', 'not_regex:/<[^>]*>/'],
         ];
     }
 }

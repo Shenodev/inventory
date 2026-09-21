@@ -5,27 +5,29 @@ export interface AuthenticatedUser {
   id: number;
   name: string;
   email: string;
+  role?: string;
+  email_verified?: boolean;
 }
 
-const TOKEN_KEY = 'sheno.inventory.token';
-const REFRESH_TOKEN_KEY = 'sheno.inventory.refresh_token';
 const USER_KEY = 'sheno.inventory.user';
 
 /**
  * Single source of truth for the signed-in session.
  *
- * The access token, refresh token and user are all persisted in localStorage
- * so a page refresh restores the session, and all are cleared together when
- * the API rejects the tokens. Keeping them in one store lets the auth
- * interceptor drop a rejected session or refresh an expired access token
- * without depending on HttpClient (which would be a circular dependency inside
- * an interceptor).
+ * SECURITY: Tokens are kept **in memory only** and never persisted to
+ * localStorage/sessionStorage. This prevents XSS from exfiltrating long-lived
+ * bearer tokens. The refresh token is stored as a httpOnly, Secure, SameSite=Lax
+ * cookie set by the API (see backend AuthController). On page reload the access
+ * token is lost and must be re-issued via POST /auth/refresh which reads the
+ * httpOnly cookie automatically (withCredentials). The user object is the only
+ * value persisted, and it contains no secrets.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthSessionStore {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
-  private readonly tokenState = signal<string | null>(this.readToken());
-  private readonly refreshTokenState = signal<string | null>(this.readRefreshToken());
+  // Tokens live only in memory — cleared on tab close / reload is intentional.
+  private readonly tokenState = signal<string | null>(null);
+  private readonly refreshTokenState = signal<string | null>(null);
   private readonly userState = signal<AuthenticatedUser | null>(this.readUser());
 
   readonly token = this.tokenState.asReadonly();
@@ -34,12 +36,13 @@ export class AuthSessionStore {
 
   setToken(token: string | null): void {
     this.tokenState.set(token);
-    this.persist(TOKEN_KEY, token);
+    // Intentionally NOT persisted to localStorage (see class doc)
   }
 
   setRefreshToken(token: string | null): void {
     this.refreshTokenState.set(token);
-    this.persist(REFRESH_TOKEN_KEY, token);
+    // Refresh is httpOnly cookie on server; we keep in memory only for
+    // legacy fallback. Do not persist to localStorage.
   }
 
   setUser(user: AuthenticatedUser | null): void {
@@ -53,6 +56,13 @@ export class AuthSessionStore {
     this.setUser(null);
   }
 
+  // Attempt silent refresh on boot if we have no access token but may have
+  // a refresh cookie. Caller (AuthService) will handle the actual HTTP.
+  hasRefreshCookie(): boolean {
+    // Cannot read httpOnly cookie from JS — assume possibly present if user was persisted
+    return this.isBrowser && this.userState() !== null;
+  }
+
   private persist(key: string, value: string | null): void {
     if (!this.isBrowser) {
       return;
@@ -63,14 +73,6 @@ export class AuthSessionStore {
     } else {
       localStorage.setItem(key, value);
     }
-  }
-
-  private readToken(): string | null {
-    return this.isBrowser ? localStorage.getItem(TOKEN_KEY) : null;
-  }
-
-  private readRefreshToken(): string | null {
-    return this.isBrowser ? localStorage.getItem(REFRESH_TOKEN_KEY) : null;
   }
 
   private readUser(): AuthenticatedUser | null {

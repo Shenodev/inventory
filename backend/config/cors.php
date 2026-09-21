@@ -23,20 +23,22 @@ return [
 
     'paths' => ['api/*'],
 
-    'allowed_methods' => ['GET', 'POST', 'OPTIONS'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
     'allowed_origins' => $origins,
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'Origin', 'X-Requested-With'],
+    // Keep header allowlist tight — Authorization for Bearer, Content-Type for JSON,
+    // X-Requested-With for legacy, plus webhook signature headers
+    'allowed_headers' => ['Accept', 'Authorization', 'Content-Type', 'Origin', 'X-Requested-With', 'X-Webhook-Signature', 'X-Webhook-Timestamp', 'X-Webhook-Event'],
 
-    'exposed_headers' => [],
+    'exposed_headers' => ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
 
     'max_age' => 86400,
 
-    // Authentication uses bearer tokens, never cookies, so credentials
-    // (cookies / TLS client certs) must not be sent cross-origin.
-    'supports_credentials' => false,
+    // Refresh token is httpOnly cookie; cross-origin cookie needs credentials.
+    // Origins are strictly allowlisted above, never "*".
+    'supports_credentials' => true,
 
 ];

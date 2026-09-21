@@ -23,12 +23,26 @@ export class AuthService {
   readonly currentUser = this.session.user;
   readonly isAuthenticated = computed(() => this.session.token() !== null);
 
-  login(email: string, password: string): Observable<LoginResponse> {
+  // Silent refresh uses httpOnly cookie; withCredentials ensures cookie is sent
+  tryRefresh(): Observable<LoginResponse | null> {
+    if (!this.session.hasRefreshCookie()) return of(null);
     return this.http
-      .post<LoginResponse>(`${API_BASE_URL}/auth/login`, { email, password })
+      .post<LoginResponse>(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
       .pipe(
         tap((response) => {
           this.session.setToken(response.access_token);
+          if (response.refresh_token) this.session.setRefreshToken(response.refresh_token);
+        }),
+      );
+  }
+
+  login(email: string, password: string): Observable<LoginResponse> {
+    return this.http
+      .post<LoginResponse>(`${API_BASE_URL}/auth/login`, { email, password }, { withCredentials: true })
+      .pipe(
+        tap((response) => {
+          this.session.setToken(response.access_token);
+          // refresh_token is also set as httpOnly cookie server-side; keep in memory as fallback
           this.session.setRefreshToken(response.refresh_token);
           this.session.setUser(response.user);
         })
@@ -36,14 +50,14 @@ export class AuthService {
   }
 
   logout(): Observable<unknown> {
-    if (this.session.token() === null) {
+    if (this.session.token() === null && !this.session.hasRefreshCookie()) {
       this.clearSession();
 
       return of(null);
     }
 
     return this.http
-      .post(`${API_BASE_URL}/auth/logout`, {})
+      .post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true })
       .pipe(finalize(() => this.clearSession()));
   }
 

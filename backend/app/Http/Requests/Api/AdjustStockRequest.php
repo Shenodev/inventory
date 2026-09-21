@@ -26,7 +26,7 @@ class AdjustStockRequest extends FormRequest
                 StockMovementType::Out->value,
             ])],
             'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'note' => ['nullable', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:255', 'not_regex:/<[^>]*>/'],
         ];
     }
 

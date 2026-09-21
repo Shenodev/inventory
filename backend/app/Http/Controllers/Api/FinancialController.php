@@ -13,11 +13,13 @@ use App\Models\StockMovement;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class FinancialController extends Controller
 {
     public function overview(): JsonResponse
     {
+        Gate::authorize('viewFinancials', \App\Models\User::class);
         $income = round((float) Transaction::query()
             ->where('type', TransactionType::Income)
             ->sum('amount'), 2);
@@ -53,6 +55,7 @@ class FinancialController extends Controller
 
     public function transactions(): JsonResponse
     {
+        Gate::authorize('viewFinancials', \App\Models\User::class);
         $transactions = Transaction::query()
             ->latest('created_at')
             ->latest('id')

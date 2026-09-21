@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ProductController extends Controller
 {
@@ -84,6 +85,7 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, Product $product): JsonResponse
     {
+        Gate::authorize('update', $product);
         $validated = $request->validated();
 
         if (array_key_exists('location', $validated)) {
@@ -114,6 +116,7 @@ class ProductController extends Controller
 
     public function adjustStock(AdjustStockRequest $request, Product $product): JsonResponse
     {
+        Gate::authorize('adjustStock', $product);
         ['product' => $updated, 'movement' => $movement] = $this->inventory->adjustStock(
             $product,
             $request->movementType(),

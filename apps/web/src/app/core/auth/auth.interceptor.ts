@@ -32,10 +32,13 @@ const refreshAccessToken = (
   session: AuthSessionStore
 ): Observable<RefreshResponse> => {
   if (refreshInFlight === null) {
+    // Send refresh via httpOnly cookie (withCredentials) when available;
+    // body fallback for legacy clients that still have token in memory.
+    const body: Record<string, string> = {};
+    const rt = session.refreshToken();
+    if (rt) body['refresh_token'] = rt;
     refreshInFlight = http
-      .post<RefreshResponse>(`${API_BASE_URL}/auth/refresh`, {
-        refresh_token: session.refreshToken(),
-      })
+      .post<RefreshResponse>(`${API_BASE_URL}/auth/refresh`, body, { withCredentials: true })
       .pipe(
         // Multicast so every request that got a 401 waits on the single
         // in-flight exchange instead of each firing its own refresh call.
@@ -79,10 +82,9 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
         return throwError(() => error);
       }
 
-      // No refresh token means the session is gone for good (never signed in,
-      // expired beyond its 7-day window, or revoked). Drop it and send the user
-      // to the sign-in page instead of leaving them on a page whose requests
-      // can only fail.
+      // No refresh token in memory means the session cannot be refreshed;
+      // tokens are intentionally not persisted to localStorage (memory only)
+      // so a page reload loses them and requires re-authentication.
       if (session.refreshToken() === null) {
         endSession(session, router);
 

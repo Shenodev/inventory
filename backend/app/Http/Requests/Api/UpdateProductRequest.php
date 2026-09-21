@@ -22,10 +22,10 @@ class UpdateProductRequest extends FormRequest
         $productId = $this->route('product')?->id ?? $this->route('product');
 
         return [
-            'location' => ['nullable', 'string', 'max:100'],
-            'barcode' => ['nullable', 'string', 'max:50', Rule::unique('products', 'barcode')->ignore($productId)],
-            'name' => ['sometimes', 'string', 'max:255'],
-            'sku' => ['sometimes', 'string', 'max:50', Rule::unique('products', 'sku')->ignore($productId)],
+            'location' => ['nullable', 'string', 'max:100', 'not_regex:/<[^>]*>/'],
+            'barcode' => ['nullable', 'string', 'max:50', 'regex:/^[A-Za-z0-9\-]+$/', Rule::unique('products', 'barcode')->ignore($productId)],
+            'name' => ['sometimes', 'string', 'max:255', 'not_regex:/<[^>]*>/'],
+            'sku' => ['sometimes', 'string', 'max:50', 'regex:/^[A-Z0-9\-]+$/i', Rule::unique('products', 'sku')->ignore($productId)],
         ];
     }
 }
