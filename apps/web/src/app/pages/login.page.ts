@@ -27,89 +27,122 @@ const DEMO_PASSWORD = 'password';
   imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex min-h-screen items-center justify-center px-4">
-      <div class="w-full max-w-sm rounded-xl bg-surface p-8 text-left">
-        <div class="flex flex-col items-center gap-3 text-center">
-          <img
-            src="/favicon-192x192.png"
-            alt="ShenoInventory"
-            width="56"
-            height="56"
-            class="h-14 w-14 rounded-xl"
-          />
-          <div>
-            <h1 class="font-heading text-2xl font-semibold text-white">
-              ShenoInventory
-            </h1>
-            <p class="mt-1 text-sm text-slate-400">
-              Warehouse &amp; order management
+    <div class="flex min-h-screen bg-[#080E1E]">
+      <!-- Left brand panel -->
+      <div class="hidden w-[52%] flex-col justify-between border-r border-white/[0.06] bg-[#0B1224] p-10 lg:flex xl:p-12">
+        <div>
+          <a class="inline-flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-[0_8px_24px_rgba(34,211,238,0.35)]">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 7h13v10H3zM16 10h3l2 3v4h-5z" /></svg>
+            </span>
+            <span>
+              <span class="block font-heading text-[16px] font-semibold text-white">ShenoInventory</span>
+              <span class="block text-[11px] font-semibold tracking-[0.16em] text-slate-500">WAREHOUSE OS</span>
+            </span>
+          </a>
+
+          <div class="mt-16 max-w-[560px]">
+            <p class="inline-flex items-center gap-2 rounded-full border border-cyan-400/15 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold tracking-widest text-cyan-300">
+              <span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span> BARCODE-NATIVE OPS
             </p>
+            <h1 class="mt-4 font-heading text-[40px] font-semibold leading-[0.95] tracking-tight text-white xl:text-[44px]">
+              Warehouse<br />
+              <span class="bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">that scans itself.</span>
+            </h1>
+            <p class="mt-4 max-w-[480px] text-[15px] leading-relaxed text-slate-400">
+              Aisle/Bay/Shelf-accurate inventory with handheld wedge scanners, camera fallback, and instant valuation. Built for the floor, not just the desk.
+            </p>
+
+            <div class="mt-8 grid grid-cols-3 gap-3">
+              <div class="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Location</p>
+                <p class="mt-2 font-mono text-sm text-white">Aisle 4, Bay 3</p>
+                <p class="font-mono text-sm text-cyan-300">Shelf B</p>
+              </div>
+              <div class="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Barcode</p>
+                <p class="mt-2 font-mono text-xs text-white">5901234123457</p>
+                <p class="mt-1 text-xs text-slate-500">EAN-13 wedge</p>
+              </div>
+              <div class="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Pick speed</p>
+                <p class="mt-2 font-heading text-xl font-semibold text-white">3× faster</p>
+                <p class="text-xs text-slate-500">vs dropdown</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        @if (sessionExpired) {
-          <p
-            class="mt-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200"
-            role="status"
-          >
-            Your session expired. Please sign in again.
-          </p>
-        }
+        <p class="text-xs text-slate-600">Trusted by ops teams · Sanctum-secured · Live sync</p>
+      </div>
 
-        <form class="mt-8" [formGroup]="form" (ngSubmit)="submit()">
-          <label class="block text-sm font-medium text-slate-300" for="email">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            formControlName="email"
-            autocomplete="username"
-            placeholder="you@example.com"
-            class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
-          />
+      <!-- Right form -->
+      <div class="flex flex-1 items-center justify-center bg-[radial-gradient(800px_400px_at_50%_-10%,rgba(34,211,238,0.08),transparent_60%)] px-4 py-10 sm:px-6">
+        <div class="w-full max-w-[420px] rounded-2xl border border-white/[0.07] bg-[#111E32] p-7 shadow-[0_16px_48px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-8">
+          <div class="flex items-center gap-3 lg:hidden">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-white">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 7h13v10H3zM16 10h3l2 3v4h-5z" /></svg>
+            </span>
+            <span class="font-heading text-[16px] font-semibold text-white">ShenoInventory</span>
+            <span class="ml-auto rounded-full bg-cyan-400/10 px-2 py-1 text-[10px] font-semibold tracking-widest text-cyan-300">WAREHOUSE OS</span>
+          </div>
 
-          <label
-            class="mt-4 block text-sm font-medium text-slate-300"
-            for="password"
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            formControlName="password"
-            autocomplete="current-password"
-            placeholder="Password"
-            class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
-          />
+          <h2 class="mt-6 font-heading text-[22px] font-semibold tracking-tight text-white">Sign in</h2>
+          <p class="mt-1 text-sm text-slate-400">Warehouse & order management · demo access below</p>
 
-          @if (error(); as message) {
-            <p
-              class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-              role="alert"
-            >
-              {{ message }}
+          @if (sessionExpired) {
+            <p class="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200" role="status">
+              Your session expired. Please sign in again.
             </p>
           }
 
-          <button
-            type="submit"
-            [disabled]="submitting()"
-            class="mt-6 w-full rounded-xl bg-electric-cyan px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {{ submitting() ? 'Signing in…' : 'Sign in' }}
-          </button>
+          <form class="mt-6" [formGroup]="form" (ngSubmit)="submit()">
+            <label class="block text-xs font-semibold uppercase tracking-widest text-slate-400" for="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              formControlName="email"
+              autocomplete="username"
+              placeholder="you@example.com"
+              class="mt-2 w-full rounded-xl border border-white/10 bg-[#080E1E] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/40 focus:ring-4 focus:ring-cyan-400/10"
+            />
 
-          <button
-            type="button"
-            [disabled]="submitting()"
-            (click)="loginAsDemo()"
-            class="mt-3 w-full rounded-xl border border-electric-cyan/40 px-4 py-3 font-medium text-electric-cyan transition-colors hover:bg-electric-cyan/10 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Login as Demo
-          </button>
-        </form>
+            <label class="mt-4 block text-xs font-semibold uppercase tracking-widest text-slate-400" for="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              formControlName="password"
+              autocomplete="current-password"
+              placeholder="Password"
+              class="mt-2 w-full rounded-xl border border-white/10 bg-[#080E1E] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/40 focus:ring-4 focus:ring-cyan-400/10"
+            />
+
+            @if (error(); as message) {
+              <p class="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300" role="alert">{{ message }}</p>
+            }
+
+            <button
+              type="submit"
+              [disabled]="submitting()"
+              class="mt-6 w-full rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-3 text-sm font-semibold text-[#07101e] shadow-[0_8px_20px_rgba(34,211,238,0.35)] transition hover:from-cyan-300 hover:to-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ submitting() ? 'Signing in…' : 'Sign in →' }}
+            </button>
+
+            <button
+              type="button"
+              [disabled]="submitting()"
+              (click)="loginAsDemo()"
+              class="mt-3 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-60"
+            >
+              Login as Demo
+            </button>
+
+            <p class="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-center text-xs leading-relaxed text-slate-500">
+              Demo: <span class="font-mono text-slate-300">demo&#64;shenodev.tech</span> · <span class="font-mono text-slate-300">password</span>
+            </p>
+          </form>
+        </div>
       </div>
     </div>
   `,
