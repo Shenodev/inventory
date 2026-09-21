@@ -219,8 +219,19 @@ const NAV_SECTIONS: NavSection[] = [
           <div class="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             <router-outlet />
           </div>
-          <footer class="border-t border-white/[0.04] px-6 py-4 text-center text-[11px] tracking-wide text-slate-600">
-            ShenoInventory · Warehouse OS · Built for barcode-native ops — Aisle/Bay/Shelf precision
+          <footer class="border-t border-white/[0.04] px-6 py-6 text-[11px] tracking-wide text-slate-500">
+            <div class="mx-auto max-w-[1500px] space-y-3">
+              <div class="flex flex-wrap justify-center gap-x-4 gap-y-2">
+                <a routerLink="/legal/privacy" class="underline decoration-white/20 underline-offset-4 hover:text-slate-300">Privacy</a>
+                <a routerLink="/legal/terms" class="underline decoration-white/20 underline-offset-4 hover:text-slate-300">Terms</a>
+                <a routerLink="/legal/cookies" class="underline decoration-white/20 underline-offset-4 hover:text-slate-300">Cookies</a>
+                <a routerLink="/legal/refund" class="underline decoration-white/20 underline-offset-4 hover:text-slate-300">Refund</a>
+                <a routerLink="/legal/licenses" class="underline decoration-white/20 underline-offset-4 hover:text-slate-300">Licenses</a>
+                <a routerLink="/legal/deletion" class="underline decoration-white/20 underline-offset-4 hover:text-slate-300">Data deletion</a>
+              </div>
+              <p>Shenodev — ShenoInventory Warehouse OS · 3 Warehouse Lane, Tallinn 10111, Estonia · VAT EE123456789 · support&#64;shenodev.tech · privacy&#64;shenodev.tech</p>
+              <p class="text-slate-600">ShenoInventory · Warehouse OS · Built for barcode-native ops — Aisle/Bay/Shelf precision · Sora & Inter fonts (OFL) · No tracking, no hidden fees — <span class="font-mono">© 2026 Shenodev</span></p>
+            </div>
           </footer>
         </main>
       </div>

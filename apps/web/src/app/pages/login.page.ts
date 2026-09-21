@@ -66,8 +66,8 @@ const DEMO_PASSWORD = 'password';
               </div>
               <div class="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
                 <p class="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Pick speed</p>
-                <p class="mt-2 font-heading text-xl font-semibold text-white">3× faster</p>
-                <p class="text-xs text-slate-500">vs dropdown</p>
+                <p class="mt-2 font-heading text-xl font-semibold text-white">3× faster*</p>
+                <p class="text-xs text-slate-500">*lab estimate vs dropdown; your results vary</p>
               </div>
             </div>
           </div>
@@ -140,6 +140,9 @@ const DEMO_PASSWORD = 'password';
 
             <p class="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-center text-xs leading-relaxed text-slate-500">
               Demo: <span class="font-mono text-slate-300">demo&#64;shenodev.tech</span> · <span class="font-mono text-slate-300">password</span>
+            </p>
+            <p class="mt-4 text-center text-[11px] leading-relaxed text-slate-500">
+              By signing in you agree to our <a href="/legal/terms" class="underline decoration-white/20 underline-offset-2 hover:text-slate-300">Terms</a> and <a href="/legal/privacy" class="underline decoration-white/20 underline-offset-2 hover:text-slate-300">Privacy</a>. · <a href="/legal/cookies" class="underline decoration-white/20 underline-offset-2 hover:text-slate-300">Cookies</a> · Shenodev, 3 Warehouse Lane, Tallinn 10111, Estonia
             </p>
           </form>
         </div>

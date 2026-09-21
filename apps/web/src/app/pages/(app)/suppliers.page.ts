@@ -293,6 +293,14 @@ type EditorState = { supplier: Supplier | null };
               class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
             />
 
+            <label class="mt-4 flex items-start gap-2 text-xs leading-relaxed text-slate-400">
+              <input type="checkbox" formControlName="consent" class="mt-0.5 h-4 w-4 rounded border-white/20 bg-deep-slate text-cyan-500 focus:ring-cyan-400/30" />
+              <span>I have consent to store this supplier and they are 16+ (see <a href="/legal/privacy" target="_blank" class="underline decoration-white/20 underline-offset-2 hover:text-white">Privacy</a>). Only name/email are required.</span>
+            </label>
+            @if (form.controls.consent.touched && form.controls.consent.invalid) {
+              <p class="mt-1 text-xs text-red-300">You must confirm consent.</p>
+            }
+
             @if (formError(); as message) {
               <p
                 class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
@@ -405,6 +413,7 @@ export default class SuppliersPage {
     name: this.formBuilder.control('', [Validators.required, Validators.maxLength(120)]),
     email: this.formBuilder.control('', [Validators.required, Validators.email, Validators.maxLength(120)]),
     phone: this.formBuilder.control('', [Validators.maxLength(30)]),
+    consent: this.formBuilder.control(false, [Validators.requiredTrue]),
   });
 
   protected readonly filteredSuppliers = computed(() => {
@@ -497,13 +506,13 @@ export default class SuppliersPage {
   }
 
   protected openCreate(): void {
-    this.form.reset({ name: '', email: '', phone: '' });
+    this.form.reset({ name: '', email: '', phone: '', consent: false });
     this.formError.set(null);
     this.editor.set({ supplier: null });
   }
 
   protected openEdit(supplier: Supplier): void {
-    this.form.reset({ name: supplier.name, email: supplier.email, phone: supplier.phone });
+    this.form.reset({ name: supplier.name, email: supplier.email, phone: supplier.phone, consent: true });
     this.formError.set(null);
     this.editor.set({ supplier });
   }

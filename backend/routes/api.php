@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DamageController;
 use App\Http\Controllers\Api\DashboardController;
@@ -20,6 +21,10 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('thrott
 Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:api');
 Route::post('/auth/email/verify-notification', [EmailVerificationController::class, 'send'])->middleware(['auth:sanctum', 'throttle:api']);
 Route::get('/auth/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth:sanctum', 'signed', 'throttle:api'])->name('verification.verify');
+
+// Public but rate-limited: data-deletion & unsubscribe (GDPR)
+Route::post('/account/data-request', [AccountController::class, 'dataRequest'])->middleware('throttle:api');
+Route::match(['get', 'post'], '/unsubscribe', [AccountController::class, 'unsubscribe'])->middleware('throttle:api');
 
 // Webhooks — always signature-verified, rate-limited
 Route::post('/webhooks/inventory', [WebhookController::class, 'handle'])->middleware(['webhook.signature', 'throttle:api']);
