@@ -32,6 +32,9 @@ class FinancialController extends Controller
             ->where('sales_orders.status', SalesOrderStatus::Shipped->value)
             ->sum(DB::raw('sales_order_items.quantity * products.cost')), 2);
 
+        $inventoryValuation = round((float) DB::table('products')
+            ->sum(DB::raw('products.total_stock * products.cost')), 2);
+
         return response()->json([
             'overview' => [
                 'total_income' => $income,
@@ -39,11 +42,34 @@ class FinancialController extends Controller
                 'net_profit' => round($income - $expenses, 2),
                 'total_cogs' => $cogs,
                 'gross_profit' => round($income - $cogs, 2),
+                'inventory_valuation' => $inventoryValuation,
                 'returns_quantity' => (int) ReturnEntry::query()->sum('quantity'),
                 'damaged_quantity' => (int) StockMovement::query()
                     ->where('type', StockMovementType::Damage)
                     ->sum('quantity'),
             ],
+        ]);
+    }
+
+    public function transactions(): JsonResponse
+    {
+        $transactions = Transaction::query()
+            ->latest('created_at')
+            ->latest('id')
+            ->limit(500)
+            ->get();
+
+        return response()->json([
+            'transactions' => $transactions
+                ->map(fn (Transaction $transaction): array => [
+                    'id' => $transaction->id,
+                    'type' => $transaction->type->value,
+                    'amount' => $transaction->amount,
+                    'reference_type' => $transaction->reference_type,
+                    'reference_id' => $transaction->reference_id,
+                    'created_at' => $transaction->created_at?->toIso8601String(),
+                ])
+                ->all(),
         ]);
     }
 }

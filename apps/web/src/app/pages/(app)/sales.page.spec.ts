@@ -10,6 +10,14 @@ import { SalesOrdersService } from '../../core/sales/sales-orders.service';
 import { ToastService } from '../../core/ui/toast.service';
 import SalesPage from './sales.page';
 
+type RequestSubmit = (this: HTMLFormElement, submitter?: HTMLElement) => void;
+
+if (typeof HTMLFormElement.prototype.requestSubmit === 'function') {
+  HTMLFormElement.prototype.requestSubmit = function (this: HTMLFormElement) {
+    this.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  } as RequestSubmit;
+}
+
 interface SalesPageInternals {
   load(force?: boolean): void;
 }
@@ -36,6 +44,22 @@ const SHIPPED_ORDER = {
   updated_at: '2026-08-21T10:00:00+00:00',
 };
 
+const SHIPPED_DETAIL = {
+  ...SHIPPED_ORDER,
+  items: [
+    {
+      id: 1,
+      product_id: 16,
+      product_sku: 'SKU-16-WDG',
+      product_name: 'Demo Widget',
+      quantity: 4,
+      unit_price: '24.75',
+      line_total: '99.00',
+    },
+  ],
+  transactions: [{ id: 1, type: 'income', amount: '99.00' }],
+};
+
 describe('SalesPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -49,10 +73,17 @@ describe('SalesPage', () => {
           provide: SalesOrdersService,
           useValue: {
             list: () => of({ sales_orders: [RESERVED_ORDER, SHIPPED_ORDER] }),
+            show: () => of({ sales_order: SHIPPED_DETAIL }),
             fulfill: (id: number) =>
               of({
                 message: `Sales order #${id} fulfilled.`,
                 sales_order: { ...RESERVED_ORDER, status: 'shipped' },
+              }),
+            processReturn: (id: number) =>
+              of({
+                message: `Return processed. Refund of 99.00 logged against sales order #${id}.`,
+                refund: '99.00',
+                sales_order: SHIPPED_ORDER,
               }),
           },
         },
@@ -104,5 +135,51 @@ describe('SalesPage', () => {
 
     const toast = TestBed.inject(ToastService);
     expect(toast.toasts().some((item) => item.type === 'success' && item.message.includes('13'))).toBe(true);
+  });
+
+  it('processes a return by selecting shipped items and submitting the return form', () => {
+    const fixture = TestBed.createComponent(SalesPage);
+    const component = fixture.componentInstance as unknown as SalesPageInternals;
+    const service = TestBed.inject(SalesOrdersService);
+    const returnSpy = vi.spyOn(service, 'processReturn');
+
+    component.load();
+    fixture.detectChanges();
+
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'));
+    const openReturn = buttons.find((element) => element.textContent?.includes('Process Return'));
+
+    expect(openReturn).toBeTruthy();
+    openReturn?.click();
+    fixture.detectChanges();
+
+    const dialog = (fixture.nativeElement as HTMLElement).querySelector('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+    expect((dialog?.textContent ?? '').includes('Demo Widget')).toBe(true);
+
+    const boxes = dialog?.querySelectorAll('input[type="checkbox"]') ?? [];
+    expect(boxes.length).toBe(1);
+    const box = boxes[0] as HTMLInputElement;
+    box.click();
+    fixture.detectChanges();
+
+    const quantity = dialog?.querySelector('input[type="number"]') as HTMLInputElement | null;
+    expect(quantity).toBeTruthy();
+    quantity!.value = '2';
+    quantity!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const submitLine = Array.from(dialog?.querySelectorAll('button') ?? []).find((element) =>
+      element.textContent?.includes('Process return')
+    );
+    submitLine?.click();
+    fixture.detectChanges();
+
+    expect(returnSpy).toHaveBeenCalledWith(12, {
+      items: [{ product_id: 16, quantity: 2 }],
+    });
+
+    const toast = TestBed.inject(ToastService);
+    expect(toast.toasts().some((item) => item.type === 'success' && item.message.includes('Return processed'))).toBe(true);
   });
 });

@@ -8,8 +8,13 @@ import {
   signal,
 } from '@angular/core';
 import { RouteMeta } from '@analogjs/router';
+import { forkJoin } from 'rxjs';
 
 import { DashboardOverview, DashboardService } from '../../core/dashboard/dashboard.service';
+import {
+  FinancialOverview,
+  FinancialsService,
+} from '../../core/financials/financials.service';
 import { formatCurrency, formatNumber } from '../../core/format';
 
 export const routeMeta: RouteMeta = {
@@ -32,7 +37,7 @@ interface RecentSale {
       <div>
         <h1 class="font-heading text-2xl font-semibold text-white">Dashboard</h1>
         <p class="mt-1 text-sm text-slate-400">
-          Live inventory, revenue and reservation overview.
+          Profitability, cash flow and inventory valuation at a glance.
         </p>
       </div>
       <button
@@ -58,25 +63,26 @@ interface RecentSale {
       </div>
     }
 
-    <section class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+    <section class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
       <article class="rounded-xl bg-surface p-6">
         <div class="flex items-center justify-between">
-          <p class="text-sm font-medium text-slate-400">Total Inventory</p>
+          <p class="text-sm font-medium text-slate-400">Net Profit</p>
           <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-deep-slate text-electric-cyan">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
-              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" />
-              <path d="M4 7l8 4 8-4" />
-              <path d="M12 21V11" />
+              <path d="M3 17l6-6 4 4 8-8" />
+              <path d="M14 7h7v7" />
             </svg>
           </span>
         </div>
-        <p class="mt-4 font-heading text-3xl font-semibold text-white">{{ totalInventory() }}</p>
-        <p class="mt-1 text-xs text-slate-500">Units currently in stock</p>
+        <p class="mt-4 font-heading text-3xl font-semibold" [class]="netProfitClass()">
+          {{ netProfit() }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Income after expenses</p>
       </article>
 
       <article class="rounded-xl bg-surface p-6">
         <div class="flex items-center justify-between">
-          <p class="text-sm font-medium text-slate-400">Sold Revenue</p>
+          <p class="text-sm font-medium text-slate-400">Total Revenue</p>
           <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-deep-slate text-electric-cyan">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
               <circle cx="12" cy="12" r="9" />
@@ -85,22 +91,66 @@ interface RecentSale {
             </svg>
           </span>
         </div>
-        <p class="mt-4 font-heading text-3xl font-semibold text-white">{{ soldRevenue() }}</p>
-        <p class="mt-1 text-xs text-slate-500">From completed sales</p>
+        <p class="mt-4 font-heading text-3xl font-semibold text-electric-cyan">{{ totalRevenue() }}</p>
+        <p class="mt-1 text-xs text-slate-500">All recorded income</p>
       </article>
 
       <article class="rounded-xl bg-surface p-6">
         <div class="flex items-center justify-between">
-          <p class="text-sm font-medium text-slate-400">Active Reservations</p>
-          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-deep-slate text-electric-cyan">
+          <p class="text-sm font-medium text-slate-400">Total Expenses</p>
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-deep-slate text-red-300">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7v5l3 2" />
+              <path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" />
+              <path d="M4 7l8 4 8-4" />
+              <path d="M12 21V11" />
             </svg>
           </span>
         </div>
-        <p class="mt-4 font-heading text-3xl font-semibold text-white">{{ activeReservations() }}</p>
-        <p class="mt-1 text-xs text-slate-500">Orders reserved and awaiting pickup</p>
+        <p class="mt-4 font-heading text-3xl font-semibold" [class]="totalExpensesClass()">
+          {{ totalExpenses() }}
+        </p>
+        <p class="mt-1 text-xs text-slate-500">Outflows and write-offs</p>
+      </article>
+
+      <article class="rounded-xl bg-surface p-6">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-slate-400">Inventory Valuation</p>
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-deep-slate text-electric-cyan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
+              <path d="M3 7h13v10H3zM16 10h3l2 3v4h-5z" />
+              <circle cx="7.5" cy="17.5" r="1.5" />
+              <circle cx="17.5" cy="17.5" r="1.5" />
+            </svg>
+          </span>
+        </div>
+        <p class="mt-4 font-heading text-3xl font-semibold text-electric-cyan">{{ inventoryValuation() }}</p>
+        <p class="mt-1 text-xs text-slate-500">Stock at cost price</p>
+      </article>
+    </section>
+
+    <section class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-xl bg-surface p-5">
+        <p class="text-sm font-medium text-slate-400">Active reservations</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-electric-cyan">{{ activeReservations() }}</p>
+        <p class="mt-1 text-xs text-slate-500">Awaiting fulfillment</p>
+      </article>
+
+      <article class="rounded-xl bg-surface p-5">
+        <p class="text-sm font-medium text-slate-400">Units in stock</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-white">{{ totalInventory() }}</p>
+        <p class="mt-1 text-xs text-slate-500">Across the catalog</p>
+      </article>
+
+      <article class="rounded-xl bg-surface p-5">
+        <p class="text-sm font-medium text-slate-400">Units returned</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-amber-300">{{ unitsReturned() }}</p>
+        <p class="mt-1 text-xs text-slate-500">Restored to stock</p>
+      </article>
+
+      <article class="rounded-xl bg-surface p-5">
+        <p class="text-sm font-medium text-slate-400">Damaged write-offs</p>
+        <p class="mt-2 font-heading text-2xl font-semibold text-red-300">{{ damagedUnits() }}</p>
+        <p class="mt-1 text-xs text-slate-500">Broken or unusable units</p>
       </article>
     </section>
 
@@ -144,24 +194,59 @@ interface RecentSale {
 })
 export default class DashboardPage {
   private readonly dashboard = inject(DashboardService);
+  private readonly financials = inject(FinancialsService);
 
   protected readonly overview = signal<DashboardOverview | null>(null);
+  protected readonly financialOverview = signal<FinancialOverview | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  protected readonly netProfit = computed(() => {
+    const overview = this.financialOverview();
+    return overview ? formatCurrency(overview.net_profit) : '—';
+  });
+
+  protected readonly netProfitClass = computed(() =>
+    (this.financialOverview()?.net_profit ?? 0) >= 0 ? 'text-electric-cyan' : 'text-red-300'
+  );
+
+  protected readonly totalRevenue = computed(() => {
+    const overview = this.financialOverview();
+    return overview ? formatCurrency(overview.total_income) : '—';
+  });
+
+  protected readonly totalExpenses = computed(() => {
+    const overview = this.financialOverview();
+    return overview ? formatCurrency(overview.total_expenses) : '—';
+  });
+
+  protected readonly totalExpensesClass = computed(() =>
+    (this.financialOverview()?.total_expenses ?? 0) > 0 ? 'text-red-300' : 'text-electric-cyan'
+  );
+
+  protected readonly inventoryValuation = computed(() => {
+    const overview = this.financialOverview();
+    return overview ? formatCurrency(overview.inventory_valuation) : '—';
+  });
 
   protected readonly totalInventory = computed(() => {
     const overview = this.overview();
     return overview ? formatNumber(overview.total_products_in_stock) : '—';
   });
 
-  protected readonly soldRevenue = computed(() => {
-    const overview = this.overview();
-    return overview ? formatCurrency(overview.total_revenue) : '—';
-  });
-
   protected readonly activeReservations = computed(() => {
     const overview = this.overview();
     return overview ? formatNumber(overview.reserved_orders) : '—';
+  });
+
+  protected readonly unitsReturned = computed(() => {
+    const overview = this.financialOverview();
+    return overview ? formatNumber(overview.returns_quantity) : '—';
+  });
+
+  protected readonly damagedUnits = computed(() => {
+    const overview = this.financialOverview();
+    return overview ? formatNumber(overview.damaged_quantity) : '—';
   });
 
   protected readonly recentSales = computed<RecentSale[]>(() =>
@@ -184,9 +269,13 @@ export default class DashboardPage {
     this.loading.set(true);
     this.error.set(null);
 
-    this.dashboard.getOverview(force).subscribe({
-      next: (overview) => {
+    forkJoin({
+      overview: this.dashboard.getOverview(force),
+      financials: this.financials.getOverview(force),
+    }).subscribe({
+      next: ({ overview, financials }) => {
         this.overview.set(overview);
+        this.financialOverview.set(financials);
         this.loading.set(false);
       },
       error: (error: unknown) => {

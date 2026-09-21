@@ -47,8 +47,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::delete('/sales-orders/{salesOrder}/items/{item}', [SalesOrderController::class, 'destroyItem']);
     Route::post('/sales-orders/{salesOrder}/fulfill', [SalesOrderController::class, 'fulfill']);
     Route::post('/sales-orders/{salesOrder}/return', [SalesOrderController::class, 'processReturn']);
+    Route::get('/returns', [SalesOrderController::class, 'returns']);
 
+    Route::get('/damages', [DamageController::class, 'index']);
     Route::post('/damages', [DamageController::class, 'store']);
 
     Route::get('/financials/overview', [FinancialController::class, 'overview']);
+    Route::get('/financials/transactions', [FinancialController::class, 'transactions']);
 });

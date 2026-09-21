@@ -43,6 +43,33 @@ export interface AdjustStockPayload {
   note?: string | null;
 }
 
+export interface ReportDamagePayload {
+  product_id: number;
+  quantity: number;
+  reason?: string | null;
+}
+
+export interface DamageEntry {
+  id?: number;
+  product_id: number;
+  sku: string | null;
+  name: string | null;
+  cost: string | null;
+  quantity: number;
+  reason: string | null;
+  loss: string | number;
+  created_at?: string | null;
+}
+
+export interface DamagesResponse {
+  damages: DamageEntry[];
+}
+
+export interface ReportDamageResponse {
+  message: string;
+  damage: DamageEntry;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProductsService {
   private readonly http = inject(HttpClient);
@@ -58,5 +85,15 @@ export class ProductsService {
       `${API_BASE_URL}/products/${productId}/stock`,
       payload
     );
+  }
+
+  reportDamage(payload: ReportDamagePayload): Observable<ReportDamageResponse> {
+    return this.http.post<ReportDamageResponse>(`${API_BASE_URL}/damages`, payload);
+  }
+
+  listDamages(force = false): Observable<DamagesResponse> {
+    return this.http.get<DamagesResponse>(`${API_BASE_URL}/damages`, {
+      context: new HttpContext().set(BYPASS_CACHE, force),
+    });
   }
 }

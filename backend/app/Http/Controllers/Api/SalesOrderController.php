@@ -74,6 +74,32 @@ class SalesOrderController extends Controller
         ]);
     }
 
+    public function returns(): JsonResponse
+    {
+        $returns = ReturnEntry::query()
+            ->with(['product:id,sku,name', 'salesOrder.customer:id,name'])
+            ->latest('created_at')
+            ->latest('id')
+            ->limit(500)
+            ->get();
+
+        return response()->json([
+            'returns' => $returns
+                ->map(fn (ReturnEntry $return): array => [
+                    'id' => $return->id,
+                    'sales_order_id' => $return->sales_order_id,
+                    'product_id' => $return->product_id,
+                    'product_sku' => $return->product?->sku,
+                    'product_name' => $return->product?->name,
+                    'quantity' => $return->quantity,
+                    'reason' => $return->reason,
+                    'customer' => $return->salesOrder?->customer?->name,
+                    'created_at' => $return->created_at?->toIso8601String(),
+                ])
+                ->all(),
+        ]);
+    }
+
     public function store(StoreSalesOrderRequest $request): JsonResponse
     {
         $salesOrder = DB::transaction(function () use ($request): SalesOrder {

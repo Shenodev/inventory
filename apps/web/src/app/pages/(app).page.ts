@@ -10,6 +10,69 @@ export const routeMeta: RouteMeta = {
   canActivate: [authGuard],
 };
 
+interface NavLink {
+  route: string;
+  label: string;
+  icon: string;
+  exact?: boolean;
+}
+
+interface NavSection {
+  label: string;
+  links: NavLink[];
+}
+
+const ICONS = {
+  dashboard:
+    'M3 3h7v9H3V3Zm11 0h7v5h-7V3Zm0 7h7v11h-7V10ZM3 16h7v5H3v-5Z',
+  products:
+    'M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9ZM7.5 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z',
+  stock: 'M12 3 4 7v10l8 4 8-4V7l-8-4ZM4 7l8 4 8-4M12 21V11',
+  damages: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01',
+  customers:
+    'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  orders: 'M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3ZM9 8h6M9 12h6',
+  returns: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
+  suppliers:
+    'M3 7h13v10H3ZM16 10h3l2 3v4h-5ZM7.5 17.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM17.5 17.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z',
+  purchaseOrders: 'M6 3h8l4 4v14H6V3ZM14 3v4h4M9 12h6M9 16h6',
+  transactions: 'M2 8l9-5 9 5-9 5-9-5ZM2 12l9 5 9-5M2 16l9 5 9-5',
+} as const;
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: 'Dashboard',
+    links: [{ route: '/', label: 'Dashboard', icon: ICONS.dashboard, exact: true }],
+  },
+  {
+    label: 'Inventory',
+    links: [
+      { route: '/products', label: 'Products', icon: ICONS.products },
+      { route: '/stock', label: 'Stock', icon: ICONS.stock },
+      { route: '/damages', label: 'Damages', icon: ICONS.damages },
+    ],
+  },
+  {
+    label: 'Sales',
+    links: [
+      { route: '/customers', label: 'Customers', icon: ICONS.customers },
+      { route: '/sales', label: 'Orders', icon: ICONS.orders },
+      { route: '/returns', label: 'Returns', icon: ICONS.returns },
+    ],
+  },
+  {
+    label: 'Purchases',
+    links: [
+      { route: '/suppliers', label: 'Suppliers', icon: ICONS.suppliers },
+      { route: '/purchase-orders', label: 'Purchase Orders', icon: ICONS.purchaseOrders },
+    ],
+  },
+  {
+    label: 'Financials',
+    links: [{ route: '/transactions', label: 'Transactions', icon: ICONS.transactions }],
+  },
+];
+
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
@@ -28,124 +91,34 @@ export const routeMeta: RouteMeta = {
           <span class="font-heading text-lg font-semibold text-white">ShenoInventory</span>
         </a>
 
-        <nav class="mt-8 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-          <a
-            routerLink="/"
-            routerLinkActive="bg-deep-slate text-white"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              class="h-5 w-5"
+        <nav class="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
+          @for (section of navSections; track section.label; let index = $index) {
+            <p
+              class="mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500"
+              [class]="index === 0 ? 'mt-0' : 'mt-6'"
             >
-              <rect x="3" y="3" width="7" height="9" rx="1.5" />
-              <rect x="14" y="3" width="7" height="5" rx="1.5" />
-              <rect x="14" y="12" width="7" height="9" rx="1.5" />
-              <rect x="3" y="16" width="7" height="5" rx="1.5" />
-            </svg>
-            Dashboard
-          </a>
-
-          <a
-            routerLink="/products"
-            routerLinkActive="bg-deep-slate text-white"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              class="h-5 w-5"
-            >
-              <path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z" />
-              <circle cx="7.5" cy="7.5" r="1.5" />
-            </svg>
-            Products
-          </a>
-
-          <a
-            routerLink="/customers"
-            routerLinkActive="bg-deep-slate text-white"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              class="h-5 w-5"
-            >
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Customers
-          </a>
-
-          <a
-            routerLink="/sales"
-            routerLinkActive="bg-deep-slate text-white"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              class="h-5 w-5"
-            >
-              <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3Z" />
-              <path d="M9 8h6M9 12h6" />
-            </svg>
-            Sales
-          </a>
-
-          <a
-            routerLink="/suppliers"
-            routerLinkActive="bg-deep-slate text-white"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              class="h-5 w-5"
-            >
-              <path d="M3 7h13v10H3zM16 10h3l2 3v4h-5z" />
-              <circle cx="7.5" cy="17.5" r="1.5" />
-              <circle cx="17.5" cy="17.5" r="1.5" />
-            </svg>
-            Suppliers
-          </a>
-
-          <a
-            routerLink="/purchase-orders"
-            routerLinkActive="bg-deep-slate text-white"
-            [routerLinkActiveOptions]="{ exact: true }"
-            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              class="h-5 w-5"
-            >
-              <path d="M6 3h8l4 4v14H6V3Z" />
-              <path d="M14 3v4h4M9 12h6M9 16h6" />
-            </svg>
-            Purchase Orders
-          </a>
+              {{ section.label }}
+            </p>
+            @for (link of section.links; track link.route) {
+              <a
+                [routerLink]="link.route"
+                routerLinkActive="bg-deep-slate text-white"
+                [routerLinkActiveOptions]="{ exact: link.exact === true }"
+                class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  class="h-5 w-5"
+                >
+                  <path [attr.d]="link.icon" />
+                </svg>
+                {{ link.label }}
+              </a>
+            }
+          }
         </nav>
 
         <div class="mt-auto shrink-0 border-t border-white/5 pt-4">
@@ -209,6 +182,7 @@ export default class AppShell {
   private readonly router = inject(Router);
   private readonly toaster = inject(ToastService);
 
+  protected readonly navSections = NAV_SECTIONS;
   protected readonly user = this.auth.currentUser;
   protected readonly toasts = this.toaster.toasts;
 

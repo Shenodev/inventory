@@ -8,7 +8,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormGroup,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidatorFn,
+  Validators,
+} from '@angular/forms';
 import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatNumber } from '../../core/format';
@@ -33,14 +40,23 @@ const LOW_STOCK_THRESHOLD = 10;
           {{ products().length }} products tracked across the warehouse.
         </p>
       </div>
-      <button
-        type="button"
-        (click)="load(true)"
-        [disabled]="loading()"
-        class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {{ loading() ? 'Refreshing…' : 'Refresh' }}
-      </button>
+      <div class="flex gap-3">
+        <button
+          type="button"
+          (click)="openDamage()"
+          class="rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-400/20"
+        >
+          Report Damage
+        </button>
+        <button
+          type="button"
+          (click)="load(true)"
+          [disabled]="loading()"
+          class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {{ loading() ? 'Refreshing…' : 'Refresh' }}
+        </button>
+      </div>
     </header>
 
     @if (notice(); as message) {
@@ -354,6 +370,124 @@ const LOW_STOCK_THRESHOLD = 10;
         </div>
       </div>
     }
+
+    @if (damageOpen()) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
+        (click)="closeDamage()"
+      >
+        <div
+          class="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6 text-left"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-damage-title"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="report-damage-title" class="font-heading text-lg font-semibold text-white">
+                Report damage
+              </h2>
+              <p class="mt-1 text-sm text-slate-400">
+                Write off broken or unusable stock.
+              </p>
+            </div>
+            <button
+              type="button"
+              (click)="closeDamage()"
+              [disabled]="damaging()"
+              aria-label="Close dialog"
+              class="rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+
+          <form class="mt-5" [formGroup]="damageForm" (ngSubmit)="submitDamage()">
+            <label class="block text-sm font-medium text-slate-300" for="damage-product">
+              Product
+            </label>
+            <select
+              id="damage-product"
+              formControlName="productId"
+              (change)="onDamageProductSelected()"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-3 text-sm text-white outline-none focus:border-electric-cyan"
+              [class]="{ 'border-red-400/50': damageForm.controls.productId.touched && damageForm.controls.productId.invalid }"
+            >
+              <option [ngValue]="null" disabled>Select a product…</option>
+              @for (product of products(); track product.id) {
+                <option [ngValue]="product.id">
+                  {{ product.name }} ({{ product.sku }}) — {{ product.available_stock }} available
+                </option>
+              }
+            </select>
+            @if (damageForm.controls.productId.touched && damageForm.controls.productId.invalid) {
+              <p class="mt-2 text-xs text-red-300">Select a product to write off.</p>
+            }
+
+            <label class="mt-4 block text-sm font-medium text-slate-300" for="damage-quantity">
+              Quantity damaged
+            </label>
+            <input
+              id="damage-quantity"
+              type="number"
+              min="1"
+              [attr.max]="damageQuantityMax()"
+              formControlName="quantity"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none focus:border-electric-cyan"
+              [class]="{ 'border-red-400/50': damageForm.controls.quantity.touched && damageForm.controls.quantity.invalid }"
+            />
+            @if (damageForm.controls.quantity.touched && damageForm.controls.quantity.invalid) {
+              <p class="mt-2 text-xs text-red-300">Enter at least 1 damaged unit.</p>
+            }
+            @if (damageForm.hasError('exceedsAvailable')) {
+              <p class="mt-2 text-xs text-red-300">{{ damageForm.getError('exceedsAvailable') }}</p>
+            }
+
+            <label class="mt-4 block text-sm font-medium text-slate-300" for="damage-reason">
+              Reason <span class="text-slate-500">(optional)</span>
+            </label>
+            <textarea
+              id="damage-reason"
+              rows="2"
+              maxlength="500"
+              formControlName="reason"
+              placeholder="e.g. Cracked during unload"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+            ></textarea>
+
+            @if (formError(); as message) {
+              <p
+                class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                role="alert"
+              >
+                {{ message }}
+              </p>
+            }
+
+            <div class="mt-6 flex gap-3">
+              <button
+                type="button"
+                (click)="closeDamage()"
+                [disabled]="damaging()"
+                class="flex-1 rounded-xl border border-white/10 px-4 py-3 font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                [disabled]="damaging()"
+                class="flex-1 rounded-xl bg-red-400 px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {{ damaging() ? 'Writing off…' : 'Write off' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
   `,
 })
 export default class ProductsPage {
@@ -374,6 +508,22 @@ export default class ProductsPage {
   protected readonly activeProduct = signal<Product | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
+
+  protected readonly damageOpen = signal(false);
+  protected readonly damaging = signal(false);
+
+  protected readonly damageForm = this.formBuilder.group(
+    {
+      productId: this.formBuilder.control<number | null>(null, Validators.required),
+      quantity: this.formBuilder.control(1, [
+        Validators.required,
+        Validators.min(1),
+        Validators.max(1000000),
+      ]),
+      reason: this.formBuilder.control('', [Validators.maxLength(500)]),
+    },
+    { validators: [this.damageAvailableValidator()] }
+  );
 
   protected readonly filteredProducts = computed(() => {
     const needle = this.query().trim().toLowerCase();
@@ -443,6 +593,10 @@ export default class ProductsPage {
   protected onEscape(): void {
     if (this.activeProduct() !== null) {
       this.closeAdjust();
+    }
+
+    if (this.damageOpen()) {
+      this.closeDamage();
     }
   }
 
@@ -577,6 +731,75 @@ export default class ProductsPage {
     return this.form.controls.type.value === 'in' ? 'Add stock' : 'Remove stock';
   }
 
+  protected openDamage(): void {
+    this.damageForm.reset({ productId: null, quantity: 1, reason: '' });
+    this.formError.set(null);
+    this.damageOpen.set(true);
+  }
+
+  protected closeDamage(): void {
+    if (this.damaging()) {
+      return;
+    }
+
+    this.damageOpen.set(false);
+  }
+
+  protected onDamageProductSelected(): void {
+    this.damageForm.controls.quantity.updateValueAndValidity();
+  }
+
+  protected damageQuantityMax(): number | null {
+    const productId = this.damageForm.controls.productId.value;
+    const product = this.products().find((item) => item.id === productId);
+    return product === undefined ? null : product.available_stock;
+  }
+
+  protected submitDamage(): void {
+    if (this.damaging()) {
+      return;
+    }
+
+    if (this.damageForm.invalid) {
+      this.damageForm.markAllAsTouched();
+      return;
+    }
+
+    const { productId, quantity, reason } = this.damageForm.getRawValue();
+
+    if (productId === null) {
+      return;
+    }
+
+    this.damaging.set(true);
+    this.formError.set(null);
+
+    this.productsService
+      .reportDamage({
+        product_id: productId,
+        quantity,
+        reason: reason.trim() || null,
+      })
+      .subscribe({
+        next: (response) => {
+          this.products.update((list) =>
+            list.map((item) =>
+              item.id === response.damage.product_id
+                ? { ...item, total_stock: item.total_stock - response.damage.quantity }
+                : item
+            )
+          );
+          this.damaging.set(false);
+          this.damageOpen.set(false);
+          this.notice.set(response.message);
+        },
+        error: (error: unknown) => {
+          this.damaging.set(false);
+          this.formError.set(this.messageFor(error, 'Unable to report the damage right now.'));
+        },
+      });
+  }
+
   protected price(value: string): string {
     return formatCurrency(value);
   }
@@ -591,6 +814,31 @@ export default class ProductsPage {
 
   protected reorderPoint(product: Product): number {
     return product.min_stock ?? LOW_STOCK_THRESHOLD;
+  }
+
+  private damageAvailableValidator(): ValidatorFn {
+    return (control: AbstractControl) => {
+      const productId = (control as FormGroup).get('productId')?.value as number | null;
+      const quantity = Number((control as FormGroup).get('quantity')?.value ?? 0);
+
+      if (productId === null || quantity <= 0) {
+        return null;
+      }
+
+      const product = this.products().find((item) => item.id === productId);
+
+      if (product === undefined) {
+        return null;
+      }
+
+      if (quantity > product.available_stock) {
+        return {
+          exceedsAvailable: `Only ${product.available_stock} unit${product.available_stock === 1 ? '' : 's'} available to write off.`,
+        };
+      }
+
+      return null;
+    };
   }
 
   private messageFor(error: unknown, fallback: string): string {

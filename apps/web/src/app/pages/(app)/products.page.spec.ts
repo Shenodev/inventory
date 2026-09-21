@@ -4,10 +4,18 @@ import { PLATFORM_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductsService } from '../../core/products/products.service';
 import ProductsPage from './products.page';
+
+type RequestSubmit = (this: HTMLFormElement, submitter?: HTMLElement) => void;
+
+if (typeof HTMLFormElement.prototype.requestSubmit === 'function') {
+  HTMLFormElement.prototype.requestSubmit = function (this: HTMLFormElement) {
+    this.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  } as RequestSubmit;
+}
 
 interface ProductsPageInternals {
   load(): void;
@@ -79,6 +87,21 @@ describe('ProductsPage', () => {
                 message: 'Stock updated.',
                 product: { ...PRODUCT, total_stock: 121, available_stock: 101 },
                 movement: { id: 1, type: 'in', quantity: 1, note: null, created_at: null },
+              }),
+            reportDamage: () =>
+              of({
+                message: '3 damaged units written off for Demo Widget.',
+                damage: {
+                  product_id: 1,
+                  sku: 'SKU-001',
+                  name: 'Demo Widget',
+                  cost: '8.00',
+                  quantity: 3,
+                  reason: 'Broken on arrival',
+                  loss: '24.00',
+                  movement_id: 1,
+                  transaction_id: 1,
+                },
               }),
           },
         },
@@ -166,5 +189,59 @@ describe('ProductsPage', () => {
     fixture.detectChanges();
 
     expect(native.textContent).toContain('Demo Widget');
+  });
+
+  it('reports damaged stock through the damage modal', () => {
+    const fixture = TestBed.createComponent(ProductsPage);
+    const component = fixture.componentInstance as unknown as ProductsPageInternals;
+    const service = TestBed.inject(ProductsService);
+    const reportDamageSpy = vi.spyOn(service, 'reportDamage');
+
+    component.load();
+    fixture.detectChanges();
+
+    const native = fixture.nativeElement as HTMLElement;
+    const openDamage = Array.from(native.querySelectorAll('button')).find((element) =>
+      element.textContent?.includes('Report Damage')
+    );
+
+    expect(openDamage).toBeTruthy();
+    openDamage?.click();
+    fixture.detectChanges();
+
+    const dialog = native.querySelector('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+    expect(dialog?.className).toContain('rounded-xl');
+
+    const select = dialog?.querySelector('select') as HTMLSelectElement | null;
+    expect(select).toBeTruthy();
+    select!.selectedIndex = 1;
+    select!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const quantity = dialog?.querySelector('#damage-quantity') as HTMLInputElement | null;
+    expect(quantity).toBeTruthy();
+    quantity!.value = '3';
+    quantity!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const reason = dialog?.querySelector('#damage-reason') as HTMLTextAreaElement | null;
+    expect(reason).toBeTruthy();
+    reason!.value = 'Broken on arrival';
+    reason!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const writeOff = Array.from(dialog?.querySelectorAll('button') ?? []).find((element) =>
+      element.textContent?.includes('Write off')
+    );
+    writeOff?.click();
+    fixture.detectChanges();
+
+    expect(reportDamageSpy).toHaveBeenCalledWith({
+      product_id: 1,
+      quantity: 3,
+      reason: 'Broken on arrival',
+    });
+    expect(native.textContent).toContain('3 damaged units written off for Demo Widget.');
   });
 });

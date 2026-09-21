@@ -8,11 +8,23 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import {
+  AbstractControl,
+  FormArray,
+  FormControl,
+  FormGroup,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidatorFn,
+  Validators,
+} from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatDate, formatNumber } from '../../core/format';
 import {
+  SalesOrder,
+  SalesOrderItem,
   SalesOrderListItem,
   SalesOrdersService,
   SalesOrderStatus,
@@ -25,9 +37,25 @@ export const routeMeta: RouteMeta = {
 
 type Tab = 'all' | SalesOrderStatus;
 
+interface ReturnLineControls {
+  included: FormControl<boolean>;
+  productId: FormControl<number>;
+  quantity: FormControl<number>;
+}
+
+const atLeastOneReturn = (form: AbstractControl) => {
+  const items = form.get('items') as FormArray | null;
+  const included = items?.controls.some((line) => {
+    const value = (line as FormGroup).getRawValue();
+    return value.included === true && Number(value.quantity) > 0;
+  });
+
+  return included === true ? null : { atLeastOneReturn: true };
+};
+
 @Component({
   selector: 'app-sales-page',
-  imports: [RouterLink],
+  imports: [ReactiveFormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
@@ -216,14 +244,17 @@ type Tab = 'all' | SalesOrderStatus;
                       >
                         Fulfill &amp; Ship
                       </button>
+                    } @else if (order.status === 'shipped') {
+                      <button
+                        type="button"
+                        (click)="requestReturn(order)"
+                        [disabled]="returning()"
+                        class="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-1.5 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Process Return
+                      </button>
                     } @else {
-                      <span class="text-sm text-slate-500">
-                        @if (order.status === 'shipped') {
-                          {{ formatCurrency(order.total_price) }} recorded
-                        } @else {
-                          —
-                        }
-                      </span>
+                      <span class="text-sm text-slate-500">—</span>
                     }
                   </div>
                 </td>
@@ -294,10 +325,156 @@ type Tab = 'all' | SalesOrderStatus;
         </div>
       </div>
     }
+
+    @if (returnTarget(); as order) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
+        (click)="cancelReturn()"
+      >
+        <div
+          class="w-full max-w-lg rounded-xl border border-white/10 bg-surface p-6 text-left"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="return-so-title"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="return-so-title" class="font-heading text-lg font-semibold text-white">
+                Process return · Order #{{ order.id }}
+              </h2>
+              <p class="mt-1 text-sm text-slate-400">{{ order.customer ?? 'Unknown customer' }}</p>
+            </div>
+            <button
+              type="button"
+              (click)="cancelReturn()"
+              [disabled]="returning() || returnLoading()"
+              aria-label="Close dialog"
+              class="rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-50"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-5 w-5">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+
+          @if (returnLoading()) {
+            <p class="mt-6 rounded-xl bg-deep-slate px-4 py-10 text-center text-sm text-slate-500">
+              Loading items…
+            </p>
+          } @else {
+            <form class="mt-5" [formGroup]="returnForm" (ngSubmit)="submitReturn()">
+              <div class="flex items-center justify-between">
+                <span class="block text-sm font-medium text-slate-300">Items to return</span>
+                <span class="text-xs text-slate-500">Restores goods to stock</span>
+              </div>
+
+              <div formArrayName="items" class="mt-3 space-y-2">
+                @for (line of returnLines.controls; track $index) {
+                  <div class="rounded-xl border border-white/10 bg-deep-slate/40 p-3" [formGroup]="line">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+                        <input
+                          type="checkbox"
+                          formControlName="included"
+                          class="mt-1 h-4 w-4 accent-electric-cyan"
+                        />
+                        <span>
+                          <span class="block font-medium text-white">
+                            {{ returnProductName(line.controls.productId.value) }}
+                          </span>
+                          <span class="mt-0.5 block text-xs text-slate-500">
+                            {{ returnProductSku(line.controls.productId.value) }} ·
+                            {{ returnSoldQuantity(line.controls.productId.value) }} sold at
+                            {{ formatCurrency(returnUnitPrice(line.controls.productId.value)) }}
+                          </span>
+                        </span>
+                      </label>
+                      <label class="w-24 shrink-0">
+                        <span class="block text-[11px] uppercase tracking-wide text-slate-500">
+                          Return qty
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          formControlName="quantity"
+                          class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-3 py-2 text-sm text-white outline-none focus:border-electric-cyan"
+                          [class]="{ 'border-red-400/50': line.touched && line.invalid }"
+                        />
+                      </label>
+                    </div>
+                    @if (line.touched && line.invalid) {
+                      <p class="mt-2 text-xs text-red-300">{{ returnLineError(line) }}</p>
+                    }
+                  </div>
+                } @empty {
+                  <p class="mt-3 rounded-xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-slate-500">
+                    This order has no items to return.
+                  </p>
+                }
+              </div>
+
+              @if (returnForm.hasError('atLeastOneReturn') && returnForm.touched) {
+                <p class="mt-3 text-xs text-red-300">Select at least one item to return.</p>
+              }
+
+              <label class="mt-4 block text-sm font-medium text-slate-300" for="return-reason">
+                Reason <span class="text-slate-500">(optional)</span>
+              </label>
+              <textarea
+                id="return-reason"
+                rows="2"
+                maxlength="500"
+                formControlName="reason"
+                placeholder="e.g. Customer returned damaged goods"
+                class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
+              ></textarea>
+
+              <div
+                class="mt-4 flex items-center justify-between rounded-xl bg-deep-slate px-4 py-3"
+              >
+                <span class="text-sm text-slate-400">Estimated refund</span>
+                <span class="font-heading text-base font-semibold text-white">
+                  {{ formatCurrency(estimateRefund()) }}
+                </span>
+              </div>
+
+              @if (formError(); as message) {
+                <p
+                  class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                  role="alert"
+                >
+                  {{ message }}
+                </p>
+              }
+
+              <div class="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  (click)="cancelReturn()"
+                  [disabled]="returning()"
+                  class="flex-1 rounded-xl border border-white/10 px-4 py-3 font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  [disabled]="returning()"
+                  class="flex-1 rounded-xl bg-electric-cyan px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {{ returning() ? 'Processing…' : 'Process return' }}
+                </button>
+              </div>
+            </form>
+          }
+        </div>
+      </div>
+    }
   `,
 })
 export default class SalesPage {
   private readonly salesOrdersService = inject(SalesOrdersService);
+  private readonly formBuilder = inject(NonNullableFormBuilder);
   private readonly toast = inject(ToastService);
 
   protected readonly orders = signal<SalesOrderListItem[]>([]);
@@ -310,6 +487,23 @@ export default class SalesPage {
   protected readonly fulfillTarget = signal<SalesOrderListItem | null>(null);
   protected readonly fulfilling = signal(false);
   protected readonly formError = signal<string | null>(null);
+
+  protected readonly returnTarget = signal<SalesOrderListItem | null>(null);
+  protected readonly returnLoading = signal(false);
+  protected readonly returnDetail = signal<SalesOrder | null>(null);
+  protected readonly returning = signal(false);
+
+  protected readonly returnForm = this.formBuilder.group(
+    {
+      items: this.formBuilder.array<FormGroup<ReturnLineControls>>([]),
+      reason: this.formBuilder.control('', [Validators.maxLength(500)]),
+    },
+    { validators: [atLeastOneReturn] }
+  );
+
+  protected get returnLines(): FormArray<FormGroup<ReturnLineControls>> {
+    return this.returnForm.get('items') as FormArray<FormGroup<ReturnLineControls>>;
+  }
 
   protected readonly activeOrders = computed(() =>
     this.orders().filter((order) => order.status === 'reserved' || order.status === 'shipped')
@@ -372,6 +566,7 @@ export default class SalesPage {
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
     this.cancelFulfill();
+    this.cancelReturn();
   }
 
   protected load(force = false): void {
@@ -489,6 +684,172 @@ export default class SalesPage {
         this.toast.show(this.messageFor(error, 'Unable to fulfill this order right now.'), 'error');
       },
     });
+  }
+
+  protected requestReturn(order: SalesOrderListItem): void {
+    this.formError.set(null);
+    this.returnTarget.set(order);
+    this.returnLoading.set(true);
+    this.returnDetail.set(null);
+    this.returnLines.clear();
+
+    this.salesOrdersService.show(order.id).subscribe({
+      next: ({ sales_order }) => {
+        this.returnDetail.set(sales_order);
+        this.returnLoading.set(false);
+
+        for (const item of sales_order.items) {
+          this.returnLines.push(this.returnLineGroup(item));
+        }
+
+        this.returnForm.controls.reason.setValue('');
+        this.returnForm.markAsPristine();
+        this.returnForm.markAsUntouched();
+      },
+      error: (error: unknown) => {
+        this.returnLoading.set(false);
+        this.returnTarget.set(null);
+        this.returnDetail.set(null);
+        this.toast.show(this.messageFor(error, `Unable to load sales order #${order.id}.`), 'error');
+      },
+    });
+  }
+
+  protected cancelReturn(): void {
+    if (this.returning() || this.returnLoading()) {
+      return;
+    }
+
+    this.returnTarget.set(null);
+    this.returnDetail.set(null);
+  }
+
+  protected submitReturn(): void {
+    const order = this.returnTarget();
+
+    if (order === null || this.returning() || this.returnLoading()) {
+      return;
+    }
+
+    if (this.returnForm.invalid) {
+      this.returnForm.markAllAsTouched();
+      return;
+    }
+
+    const reason = this.returnForm.controls.reason.value.trim();
+    const items = this.returnLines.controls
+      .map((line) => line.getRawValue())
+      .filter((line) => line.included && line.quantity > 0)
+      .map((line) =>
+        reason !== ''
+          ? { product_id: line.productId, quantity: line.quantity, reason }
+          : { product_id: line.productId, quantity: line.quantity }
+      );
+
+    if (items.length === 0) {
+      return;
+    }
+
+    this.returning.set(true);
+    this.formError.set(null);
+
+    this.salesOrdersService.processReturn(order.id, { items }).subscribe({
+      next: ({ sales_order, message }) => {
+        this.returning.set(false);
+        this.returnTarget.set(null);
+        this.returnDetail.set(null);
+        this.returnLines.clear();
+        this.upsertListItem(sales_order);
+        this.toast.show(message);
+      },
+      error: (error: unknown) => {
+        this.returning.set(false);
+        this.formError.set(this.messageFor(error, 'Unable to process the return right now.'));
+      },
+    });
+  }
+
+  protected estimateRefund(): string {
+    const detail = this.returnDetail();
+
+    if (detail === null) {
+      return '0.00';
+    }
+
+    const items = detail.items;
+    let total = 0;
+
+    for (let index = 0; index < this.returnLines.length; index += 1) {
+      const raw = this.returnLines.at(index)?.getRawValue();
+
+      if (raw !== undefined && raw.included && raw.quantity > 0) {
+        total += Number(items[index].unit_price) * raw.quantity;
+      }
+    }
+
+    return total.toFixed(2);
+  }
+
+  protected returnLineError(line: FormGroup<ReturnLineControls>): string {
+    const exceeds = line.getError('exceedsSold');
+
+    if (typeof exceeds === 'string') {
+      return exceeds;
+    }
+
+    if (line.hasError('returnQuantity')) {
+      return 'Enter a positive quantity up to the number sold.';
+    }
+
+    return 'Invalid return quantity.';
+  }
+
+  protected returnProductName(productId: number): string {
+    return this.returnDetail()?.items.find((item) => item.product_id === productId)?.product_name ?? `Product #${productId}`;
+  }
+
+  protected returnProductSku(productId: number): string {
+    return this.returnDetail()?.items.find((item) => item.product_id === productId)?.product_sku ?? '—';
+  }
+
+  protected returnSoldQuantity(productId: number): number {
+    return this.returnDetail()?.items.find((item) => item.product_id === productId)?.quantity ?? 0;
+  }
+
+  protected returnUnitPrice(productId: number): string {
+    return this.returnDetail()?.items.find((item) => item.product_id === productId)?.unit_price ?? '0.00';
+  }
+
+  private returnLineGroup(item: SalesOrderItem): FormGroup<ReturnLineControls> {
+    const group = this.formBuilder.group({
+      included: this.formBuilder.control(false),
+      productId: this.formBuilder.control(item.product_id),
+      quantity: this.formBuilder.control(1),
+    });
+
+    group.setValidators([this.returnLineValidator(item)]);
+    return group;
+  }
+
+  private returnLineValidator(item: SalesOrderItem): ValidatorFn {
+    return (control: AbstractControl) => {
+      const included = control.get('included')?.value === true;
+      const quantity = Number(control.get('quantity')?.value ?? 0);
+
+      if (!included) {
+        return null;
+      }
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        return { returnQuantity: true };
+      }
+
+      if (quantity > item.quantity) {
+        return { exceedsSold: `Cannot return more than ${item.quantity} unit${item.quantity === 1 ? '' : 's'} sold.` };
+      }
+
+      return null;
+    };
   }
 
   protected formatCurrency(value: string | number): string {

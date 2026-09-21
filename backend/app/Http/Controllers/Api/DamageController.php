@@ -9,6 +9,7 @@ use App\Enums\TransactionType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreDamageRequest;
 use App\Models\Product;
+use App\Models\StockMovement;
 use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,33 @@ use Illuminate\Validation\ValidationException;
 class DamageController extends Controller
 {
     public function __construct(private readonly InventoryService $inventory) {}
+
+    public function index(): JsonResponse
+    {
+        $movements = StockMovement::query()
+            ->with(['product:id,sku,name,cost'])
+            ->where('type', StockMovementType::Damage)
+            ->latest('created_at')
+            ->latest('id')
+            ->limit(500)
+            ->get();
+
+        return response()->json([
+            'damages' => $movements
+                ->map(fn (StockMovement $movement): array => [
+                    'id' => $movement->id,
+                    'product_id' => $movement->product_id,
+                    'sku' => $movement->product?->sku,
+                    'name' => $movement->product?->name,
+                    'cost' => $movement->product?->cost,
+                    'quantity' => $movement->quantity,
+                    'reason' => $movement->note,
+                    'loss' => round((float) $movement->product?->cost * $movement->quantity, 2),
+                    'created_at' => $movement->created_at?->toIso8601String(),
+                ])
+                ->all(),
+        ]);
+    }
 
     /**
      * Atomically report damaged stock: deduct the units from the inventory

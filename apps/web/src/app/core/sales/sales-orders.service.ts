@@ -61,6 +61,38 @@ export interface CreateSalesOrderPayload {
   items: SalesOrderLinePayload[];
 }
 
+export interface SalesOrderReturnLinePayload {
+  product_id: number;
+  quantity: number;
+  reason?: string;
+}
+
+export interface ProcessReturnPayload {
+  items: SalesOrderReturnLinePayload[];
+}
+
+export interface ProcessReturnResponse {
+  message: string;
+  refund: string;
+  sales_order: SalesOrder;
+}
+
+export interface SaleReturnEntry {
+  id: number;
+  sales_order_id: number;
+  product_id: number;
+  product_sku: string | null;
+  product_name: string | null;
+  quantity: number;
+  reason: string | null;
+  customer: string | null;
+  created_at: string | null;
+}
+
+export interface ReturnsResponse {
+  returns: SaleReturnEntry[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class SalesOrdersService {
   private readonly http = inject(HttpClient);
@@ -82,7 +114,24 @@ export class SalesOrdersService {
     return this.http.post<SalesOrderResponse>(`${API_BASE_URL}/sales-orders`, payload);
   }
 
+  show(id: number): Observable<SalesOrderResponse> {
+    return this.http.get<SalesOrderResponse>(`${API_BASE_URL}/sales-orders/${id}`);
+  }
+
   fulfill(id: number): Observable<SalesOrderResponse> {
     return this.http.post<SalesOrderResponse>(`${API_BASE_URL}/sales-orders/${id}/fulfill`, {});
+  }
+
+  processReturn(id: number, payload: ProcessReturnPayload): Observable<ProcessReturnResponse> {
+    return this.http.post<ProcessReturnResponse>(
+      `${API_BASE_URL}/sales-orders/${id}/return`,
+      payload
+    );
+  }
+
+  listReturns(force = false): Observable<ReturnsResponse> {
+    return this.http.get<ReturnsResponse>(`${API_BASE_URL}/returns`, {
+      context: new HttpContext().set(BYPASS_CACHE, force),
+    });
   }
 }
