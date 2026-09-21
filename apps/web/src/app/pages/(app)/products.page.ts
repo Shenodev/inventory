@@ -28,6 +28,8 @@ export const routeMeta: RouteMeta = {
 const PAGE_SIZE = 50;
 const LOW_STOCK_THRESHOLD = 10;
 
+type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
+
 @Component({
   selector: 'app-products-page',
   imports: [ReactiveFormsModule],
@@ -201,6 +203,7 @@ const LOW_STOCK_THRESHOLD = 10;
               <th scope="col" class="px-6 py-3 text-center font-medium">Reserved</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Sold</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Available</th>
+              <th scope="col" class="px-6 py-3 font-medium">Status</th>
               <th scope="col" class="px-6 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
@@ -226,6 +229,14 @@ const LOW_STOCK_THRESHOLD = 10;
                 >
                   {{ product.available_stock }}
                 </td>
+                <td class="px-6 py-4">
+                  <span
+                    class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+                    [class]="statusChipClass(statusOf(product))"
+                  >
+                    {{ statusLabel(statusOf(product)) }}
+                  </span>
+                </td>
                 <td class="px-6 py-4 text-right">
                   <button
                     type="button"
@@ -238,7 +249,7 @@ const LOW_STOCK_THRESHOLD = 10;
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="px-6 py-10 text-center text-slate-500">
+                <td colspan="7" class="px-6 py-10 text-center text-slate-500">
                   {{ emptyLabel() }}
                 </td>
               </tr>
@@ -810,6 +821,44 @@ export default class ProductsPage {
 
   protected availableClass(available: number): string {
     return available <= 0 ? 'text-red-300' : 'text-electric-cyan';
+  }
+
+  protected statusOf(product: Product): StockStatus {
+    const available = product.available_stock;
+
+    if (available === 0) {
+      return 'out-of-stock';
+    }
+
+    if (available <= this.reorderPoint(product)) {
+      return 'low-stock';
+    }
+
+    return 'in-stock';
+  }
+
+  protected statusLabel(status: StockStatus): string {
+    if (status === 'out-of-stock') {
+      return 'Out of stock';
+    }
+
+    if (status === 'low-stock') {
+      return 'Low stock';
+    }
+
+    return 'In stock';
+  }
+
+  protected statusChipClass(status: StockStatus): string {
+    if (status === 'out-of-stock') {
+      return 'bg-red-500/10 text-red-300';
+    }
+
+    if (status === 'low-stock') {
+      return 'bg-amber-400/10 text-amber-300';
+    }
+
+    return 'bg-electric-cyan/10 text-electric-cyan';
   }
 
   protected reorderPoint(product: Product): number {

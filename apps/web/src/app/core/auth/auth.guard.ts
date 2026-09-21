@@ -1,19 +1,14 @@
-import { isPlatformBrowser } from '@angular/common';
-import { PLATFORM_ID, inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn } from '@angular/router';
 
-import { AuthService } from './auth.service';
-
-export const authGuard: CanActivateFn = () => {
-  // The token lives in localStorage, which the server cannot read. Allow the
-  // server render through and enforce the guard in the browser, so deep links
-  // work instead of being bounced to /login before hydration.
-  if (!isPlatformBrowser(inject(PLATFORM_ID))) {
-    return true;
-  }
-
-  const auth = inject(AuthService);
-  const router = inject(Router);
-
-  return auth.isAuthenticated() ? true : router.createUrlTree(['/login']);
-};
+/**
+ * The guard alone cannot decide before the first render: the session lives in
+ * localStorage, which the server cannot read, so an inline redirect on the
+ * server would paint the login page over every refresh before hydration.
+ *
+ * Instead the app shell enforces auth right after the first client paint (see
+ * AppShell.enforceSession). That keeps an authenticated refresh on its page
+ * with no login flash, and still sends genuinely signed-out visitors to
+ * /login. Returns true here so the SSR shell and the hydrated shell always
+ * agree on the initial render.
+ */
+export const authGuard: CanActivateFn = () => true;

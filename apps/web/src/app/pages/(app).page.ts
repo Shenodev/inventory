@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, afterNextRender, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { RouteMeta } from '@analogjs/router';
 
@@ -27,11 +27,9 @@ const ICONS = {
     'M3 3h7v9H3V3Zm11 0h7v5h-7V3Zm0 7h7v11h-7V10ZM3 16h7v5H3v-5Z',
   products:
     'M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9ZM7.5 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z',
-  stock: 'M12 3 4 7v10l8 4 8-4V7l-8-4ZM4 7l8 4 8-4M12 21V11',
   damages: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01',
   customers:
     'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
-  orders: 'M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3ZM9 8h6M9 12h6',
   returns: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5',
   suppliers:
     'M3 7h13v10H3ZM16 10h3l2 3v4h-5ZM7.5 17.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM17.5 17.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z',
@@ -48,15 +46,13 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Inventory',
     links: [
       { route: '/products', label: 'Products', icon: ICONS.products },
-      { route: '/stock', label: 'Stock', icon: ICONS.stock },
       { route: '/damages', label: 'Damages', icon: ICONS.damages },
     ],
   },
   {
-    label: 'Sales',
+    label: 'Customers',
     links: [
       { route: '/customers', label: 'Customers', icon: ICONS.customers },
-      { route: '/sales', label: 'Orders', icon: ICONS.orders },
       { route: '/returns', label: 'Returns', icon: ICONS.returns },
     ],
   },
@@ -185,6 +181,16 @@ export default class AppShell {
   protected readonly navSections = NAV_SECTIONS;
   protected readonly user = this.auth.currentUser;
   protected readonly toasts = this.toaster.toasts;
+
+  constructor() {
+    afterNextRender(() => this.enforceSession());
+  }
+
+  private enforceSession(): void {
+    if (!this.auth.isAuthenticated()) {
+      void this.router.navigateByUrl('/login');
+    }
+  }
 
   protected dismissToast(id: number): void {
     this.toaster.dismiss(id);

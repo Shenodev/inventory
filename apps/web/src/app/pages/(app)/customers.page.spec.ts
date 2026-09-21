@@ -54,7 +54,6 @@ describe('CustomersPage', () => {
     expect(text).toContain('jane@company.com');
     expect(text).toContain('+1-206-555-0198');
     expect(text).toContain('Sales orders placed');
-    expect(text).toContain('New order');
   });
 
   it('opens a rounded-xl create dialog from the header action', () => {

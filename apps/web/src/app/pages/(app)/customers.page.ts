@@ -9,7 +9,6 @@ import {
   signal,
 } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { RouteMeta } from '@analogjs/router';
 
 import { formatDate, formatNumber } from '../../core/format';
@@ -23,7 +22,7 @@ const PAGE_SIZE = 50;
 
 @Component({
   selector: 'app-customers-page',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
@@ -153,7 +152,6 @@ const PAGE_SIZE = 50;
               <th scope="col" class="px-6 py-3 font-medium">Contact</th>
               <th scope="col" class="px-6 py-3 text-center font-medium">Orders</th>
               <th scope="col" class="px-6 py-3 font-medium">Added</th>
-              <th scope="col" class="px-6 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
@@ -182,21 +180,10 @@ const PAGE_SIZE = 50;
                 <td class="px-6 py-4 text-sm text-slate-400">
                   {{ formatDate(customer.created_at) }}
                 </td>
-                <td class="px-6 py-4">
-                  <div class="flex justify-end">
-                    <a
-                      [routerLink]="['/sales/create']"
-                      [queryParams]="{ customer: customer.id }"
-                      class="rounded-xl border border-white/10 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
-                    >
-                      New order
-                    </a>
-                  </div>
-                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="5" class="px-6 py-10 text-center text-slate-500">
+                <td colspan="4" class="px-6 py-10 text-center text-slate-500">
                   {{ emptyLabel() }}
                 </td>
               </tr>
@@ -235,9 +222,7 @@ const PAGE_SIZE = 50;
               <h2 id="customer-editor-title" class="font-heading text-lg font-semibold text-white">
                 New customer
               </h2>
-              <p class="mt-1 text-sm text-slate-400">
-                Add a buyer so you can create sales orders for them.
-              </p>
+              <p class="mt-1 text-sm text-slate-400">Add a buyer to your customer directory.</p>
             </div>
             <button
               type="button"

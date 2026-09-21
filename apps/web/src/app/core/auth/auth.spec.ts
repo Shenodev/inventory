@@ -5,7 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { PLATFORM_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, UrlTree, provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_BASE_URL } from '../api.base-url';
@@ -192,7 +192,7 @@ describe('authInterceptor', () => {
 });
 
 describe('authGuard', () => {
-  it('redirects unauthenticated users to /login', () => {
+  it('allows the initial render so the shell enforces auth after the first paint', () => {
     TestBed.configureTestingModule({
       providers: [
         browserPlatform,
@@ -204,7 +204,6 @@ describe('authGuard', () => {
 
     const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
 
-    expect(result).toBeInstanceOf(UrlTree);
-    expect(String(result)).toBe('/login');
+    expect(result).toBe(true);
   });
 });
