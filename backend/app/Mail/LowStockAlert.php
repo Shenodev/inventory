@@ -20,7 +20,7 @@ class LowStockAlert extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            to: [config('mail.alerts_to', 'admin@contact.inventory.shenodev.tech')],
+            to: [config('mail.alerts_to', 'admin@contact.shenodev.tech')],
             subject: "Low stock: {$this->product->name} ({$this->product->sku})",
         );
     }

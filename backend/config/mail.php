@@ -109,7 +109,7 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@contact.inventory.shenodev.tech'),
+        'address' => env('MAIL_FROM_ADDRESS', 'hello@contact.shenodev.tech'),
         'name' => env('MAIL_FROM_NAME', 'ShenoInventory'),
     ],
 
@@ -122,6 +122,6 @@ return [
     |
     */
 
-    'alerts_to' => env('MAIL_ALERTS_TO', 'admin@contact.inventory.shenodev.tech'),
+    'alerts_to' => env('MAIL_ALERTS_TO', 'admin@contact.shenodev.tech'),
 
 ];
