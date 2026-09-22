@@ -74,8 +74,9 @@ class AuthController extends Controller
         );
 
         // httpOnly refresh cookie: token no longer lives in JS-accessible storage alone
-        // Secure=true only in production/https; SameSite=Lax prevents CSRF while allowing top-level navigation
-        $secure = app()->environment('production') || $request->isSecure();
+        // Secure=true in production/https (trusted via Vercel proxy headers);
+        // SameSite=Lax prevents CSRF while allowing top-level navigation.
+        $secure = app()->environment('production') || $request->isSecure() || $request->header('X-Forwarded-Proto') === 'https';
         $refreshCookie = cookie(
             'refresh_token',
             $refreshToken->plainTextToken,
@@ -147,29 +148,60 @@ class AuthController extends Controller
             ], JsonResponse::HTTP_UNAUTHORIZED);
         }
 
+        // Rotate the refresh token: the one presented is now spent, so a replayed
+        // or stolen refresh token cannot be used to mint access tokens forever.
+        $newRefreshToken = $user->createToken(
+            $token->name,
+            ['issue-access-token'],
+            now()->addDays(self::REFRESH_TOKEN_TTL_DAYS),
+        );
+
+        $token->delete();
+
         $accessToken = $user->createToken(
             $token->name.' access',
             ['access'],
             now()->addMinutes(self::ACCESS_TOKEN_TTL_MINUTES),
         );
 
-        return response()->json([
+        $secure = app()->environment('production') || $request->isSecure() || $request->header('X-Forwarded-Proto') === 'https';
+        $refreshCookie = cookie(
+            'refresh_token',
+            $newRefreshToken->plainTextToken,
+            self::REFRESH_TOKEN_TTL_DAYS * 24 * 60,
+            '/',
+            null,
+            $secure,
+            true, // httpOnly
+            false,
+            'Lax'
+        );
+
+        $response = response()->json([
             'access_token' => $accessToken->plainTextToken,
+            'refresh_token' => $newRefreshToken->plainTextToken,
             'token_type' => 'Bearer',
             'expires_in' => self::ACCESS_TOKEN_TTL_MINUTES * 60,
         ]);
+
+        return $response->withCookie($refreshCookie);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        // Revoke current access token + all refresh tokens for this device/session
+        // Revoke current access token + all refresh tokens for the user so a
+        // logout actually ends the session server-side (cookie alone can be
+        // replayed until it expires).
         $user = $request->user();
+        if ($user instanceof User) {
+            $user->tokens()
+                ->where('abilities', 'like', '%"issue-access-token"%')
+                ->delete();
+        }
         $current = $request->user()?->currentAccessToken();
         if ($current) {
             $current->delete();
         }
-        // Optionally revoke all refresh tokens for user to fully logout everywhere:
-        // $user?->tokens()->where('abilities', 'like', '%issue-access-token%')->delete();
 
         $response = response()->json([
             'message' => 'Logged out.',

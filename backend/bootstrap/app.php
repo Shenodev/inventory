@@ -8,9 +8,11 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->throttleApi();
 
+        // Requests reach us through Vercel's proxy; trust its forwarded proto
+        // headers so isSecure()/Secure cookies and client IPs behave correctly.
+        $middleware->trustProxies(at: '*');
+
         // Global security headers on every response
         $middleware->append(SecurityHeaders::class);
 
@@ -29,6 +35,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureRole::class,
             'webhook.signature' => VerifyWebhookSignature::class,
+            'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
         ]);
 
         // Rate limiters are registered in AppServiceProvider::boot() where the
@@ -46,13 +54,21 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request, Throwable $e): bool => $request->is('api/*') || $request->expectsJson(),
         );
 
-        // Never leak stack traces or SQL to clients; always surface the error
-        // class/message to the log channel so runtime failures are diagnosable
-        // regardless of environment. Only 5xx are intercepted here: 401/403
-        // (auth/RBAC) and other 4xx must keep Laravel's default rendering so
-        // unauthenticated/forbidden responses carry the correct status.
-        $exceptions->render(function (Throwable $e, Request $request): ?JsonResponse {
+        // Only 5xx are intercepted here: 401/403 (auth/RBAC), 422 (validation)
+        // and other 4xx must keep their default rendering so the correct status
+        // code survives to the client. HttpResponseException carries a fully
+        // rendered response (e.g. the custom 429 from the login limiter or a
+        // validation error), so hand it back untouched.
+        $exceptions->render(function (Throwable $e, Request $request): ?Response {
             if (! $request->is('api/*')) {
+                return null;
+            }
+
+            if ($e instanceof HttpResponseException) {
+                return $e->getResponse();
+            }
+
+            if ($e instanceof ValidationException) {
                 return null;
             }
 

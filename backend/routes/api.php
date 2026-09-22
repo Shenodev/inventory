@@ -19,8 +19,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:api');
-Route::post('/auth/email/verify-notification', [EmailVerificationController::class, 'send'])->middleware(['auth:sanctum', 'throttle:api']);
-Route::get('/auth/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth:sanctum', 'signed', 'throttle:api'])->name('verification.verify');
+
+// Landing route for the EnsureEmailIsVerified redirect (verification.notice) so
+// unverified non-JSON requests get a defined response instead of a 500.
+Route::get('/email/verify', fn () => response()->json(
+    ['message' => 'Your email address is not verified.'],
+    403,
+))->name('verification.notice');
+
+Route::post('/auth/email/verify-notification', [EmailVerificationController::class, 'send'])->middleware(['auth:sanctum', 'abilities:access', 'throttle:api']);
+Route::get('/auth/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth:sanctum', 'abilities:access', 'signed', 'throttle:api'])->name('verification.verify');
 
 // Public but rate-limited: data-deletion & unsubscribe (GDPR)
 Route::post('/account/data-request', [AccountController::class, 'dataRequest'])->middleware('throttle:api');
@@ -29,7 +37,7 @@ Route::match(['get', 'post'], '/unsubscribe', [AccountController::class, 'unsubs
 // Webhooks — always signature-verified, rate-limited
 Route::post('/webhooks/inventory', [WebhookController::class, 'handle'])->middleware(['webhook.signature', 'throttle:api']);
 
-Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'me']);
 

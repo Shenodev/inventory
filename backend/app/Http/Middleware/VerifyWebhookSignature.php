@@ -20,11 +20,10 @@ class VerifyWebhookSignature
         $secret = (string) config('app.webhook_secret', env('WEBHOOK_SECRET', ''));
 
         if ($secret === '') {
-            // No secret configured -> reject all webhook calls in production
-            if (app()->environment('production')) {
-                return response()->json(['message' => 'Webhook not configured.'], 503);
-            }
-            return $next($request);
+            // No secret configured -> reject all webhook calls, in every
+            // environment. An unset WEBHOOK_SECRET must never silently accept
+            // unauthenticated webhook payloads outside production.
+            return response()->json(['message' => 'Webhook not configured.'], 503);
         }
 
         $signature = $request->header('X-Webhook-Signature', '');

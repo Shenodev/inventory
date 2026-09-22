@@ -18,6 +18,7 @@ const isAuthRequest = (url: string): boolean =>
 
 interface RefreshResponse {
   access_token: string;
+  refresh_token?: string;
 }
 
 /**
@@ -92,7 +93,12 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       }
 
       return refreshAccessToken(http, session).pipe(
-        tap((response) => session.setToken(response.access_token)),
+        tap((response) => {
+          session.setToken(response.access_token);
+          // Refresh tokens are rotated server-side; keep the in-memory mirror
+          // in sync so the fallback path never sends a spent token.
+          if (response.refresh_token) session.setRefreshToken(response.refresh_token);
+        }),
         // Retry the original request with the freshly issued access token.
         switchMap((response) =>
           next(
