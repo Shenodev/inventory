@@ -62,5 +62,34 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
+// Capture any fatal that bypasses Laravel's handler (they would otherwise be
+// replaced by Vercel's runtime with a bare JSON 500 and no diagnostics).
+register_shutdown_function(function (): void {
+    $error = error_get_last();
+
+    if ($error === null || ! in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        return;
+    }
+
+    fwrite(STDERR, sprintf(
+        "FATAL %s in %s on line %d\n",
+        $error['message'],
+        $error['file'],
+        $error['line'],
+    ));
+});
+
+set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
+    $mask = E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR;
+
+    if (($severity & $mask) === 0) {
+        return false;
+    }
+
+    fwrite(STDERR, sprintf("PHP ERROR [%d] %s in %s on line %d\n", $severity, $message, $file, $line));
+
+    return false;
+});
+
 require __DIR__.'/../public/index.php';
 
