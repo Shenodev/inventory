@@ -40,7 +40,12 @@ class AppServiceProvider extends ServiceProvider
     private function configureRateLimiting(): void
     {
         RateLimiter::for('api', function (Request $request): Limit {
-            $key = (string) ($request->user()?->getAuthIdentifier() ?? $request->ip());
+            // Authenticated traffic is keyed per user AND per IP so separate
+            // devices/contexts of the same account never drain each other's
+            // allowance (a shared user-only bucket makes one tab starve another).
+            $key = $request->user() !== null
+                ? (string) $request->user()->getAuthIdentifier().'|'.$request->ip()
+                : (string) $request->ip();
 
             return Limit::perMinute(60)->by($key);
         });
