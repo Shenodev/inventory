@@ -42,13 +42,18 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request, Throwable $e): bool => $request->is('api/*') || $request->expectsJson(),
         );
 
-        // Never leak stack traces or SQL to clients in production
+        // Never leak stack traces or SQL to clients; always surface the error
+        // class/message to the log channel so runtime failures are diagnosable
+        // regardless of environment.
         $exceptions->render(function (Throwable $e, Request $request) {
-            if ($request->is('api/*') && app()->environment('production')) {
+            if ($request->is('api/*')) {
                 $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
                 if ($status >= 500) {
                     Log::error('Unhandled exception', [
+                        'class' => get_class($e),
                         'exception' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
                         'path' => $request->path(),
                         // never log sensitive payload
                     ]);
