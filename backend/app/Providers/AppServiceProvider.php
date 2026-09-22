@@ -47,13 +47,13 @@ class AppServiceProvider extends ServiceProvider
                 ? (string) $request->user()->getAuthIdentifier().'|'.$request->ip()
                 : (string) $request->ip();
 
-            return Limit::perMinute(60)->by($key);
+            return Limit::perMinute(120)->by($key);
         });
 
         RateLimiter::for('login', function (Request $request): Limit {
             $email = Str::lower((string) $request->input('email'));
 
-            return Limit::perMinutes(15, 5)
+            return Limit::perMinutes(15, 15)
                 ->by($email.'|'.$request->ip())
                 ->response(fn (Request $request, array $headers): JsonResponse => response()->json(
                     ['message' => 'Too many login attempts. Try again in 15 minutes.'],
