@@ -100,7 +100,6 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role instanceof \App\Enums\UserRole ? $user->role->value : (string) ($user->role ?? 'operator'),
-                'email_verified' => $user->hasVerifiedEmail(),
             ],
         ]);
 
@@ -119,7 +118,6 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role instanceof \App\Enums\UserRole ? $user->role->value : (string) ($user->role ?? 'operator'),
-                'email_verified' => $user->hasVerifiedEmail(),
             ],
         ]);
     }

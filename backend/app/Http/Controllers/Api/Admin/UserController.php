@@ -15,7 +15,7 @@ class UserController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $users = User::query()->orderBy('name')->get(['id', 'name', 'email', 'role', 'email_verified_at', 'created_at']);
+        $users = User::query()->orderBy('name')->get(['id', 'name', 'email', 'role', 'created_at']);
 
         return response()->json([
             'users' => $users->map(fn (User $u) => [
@@ -23,7 +23,6 @@ class UserController extends Controller
                 'name' => $u->name,
                 'email' => $u->email,
                 'role' => $u->role instanceof UserRole ? $u->role->value : (string) ($u->role ?? UserRole::Operator->value),
-                'verified' => $u->hasVerifiedEmail(),
                 'created_at' => $u->created_at?->toIso8601String(),
             ]),
         ]);

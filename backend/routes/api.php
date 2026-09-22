@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DamageController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\FinancialController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
@@ -20,16 +19,6 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:api');
 
-// Landing route for the EnsureEmailIsVerified redirect (verification.notice) so
-// unverified non-JSON requests get a defined response instead of a 500.
-Route::get('/email/verify', fn () => response()->json(
-    ['message' => 'Your email address is not verified.'],
-    403,
-))->name('verification.notice');
-
-Route::post('/auth/email/verify-notification', [EmailVerificationController::class, 'send'])->middleware(['auth:sanctum', 'abilities:access', 'throttle:api']);
-Route::get('/auth/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth:sanctum', 'abilities:access', 'signed', 'throttle:api'])->name('verification.verify');
-
 // Public but rate-limited: data-deletion & unsubscribe (GDPR)
 Route::post('/account/data-request', [AccountController::class, 'dataRequest'])->middleware('throttle:api');
 Route::match(['get', 'post'], '/unsubscribe', [AccountController::class, 'unsubscribe'])->middleware('throttle:api');
@@ -41,7 +30,7 @@ Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(f
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'me']);
 
-    Route::get('/dashboard', DashboardController::class)->middleware('verified');
+    Route::get('/dashboard', DashboardController::class);
 
     // Products: read for all, write for manager+
     Route::get('/products', [ProductController::class, 'index']);

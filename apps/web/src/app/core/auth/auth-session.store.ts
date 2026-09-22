@@ -6,7 +6,6 @@ export interface AuthenticatedUser {
   name: string;
   email: string;
   role?: string;
-  email_verified?: boolean;
 }
 
 const USER_KEY = 'sheno.inventory.user';

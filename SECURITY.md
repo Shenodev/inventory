@@ -12,7 +12,7 @@ Untrusted: HTTP requests, form fields, barcodes, file uploads, webhooks, third-p
 | 1 | Protect admin routes | `backend/routes/api.php` `prefix('admin')->middleware('role:admin')`, `app/Http/Middleware/EnsureRole.php`, frontend `role.guard.ts` | Defense in depth: client guard only hides UI; server returns 403 |
 | 2 | Server-side permissions | `app/Policies/ProductPolicy.php`, `FinancialPolicy.php`, `AppServiceProvider::registerPolicies()`, `Gate::authorize` in controllers, `EnsureRole` middleware on writes | Least privilege: Operator read, Manager mutate inventory, Admin financials/users |
 | 3 | Enable RLS | `config/rls.php` (RLS_ENABLED=true), policies + scopes | MySQL has no native RLS; app-level row policies enforced via Gates/Scopes. Ready to map to Postgres RLS if migrated to Supabase |
-| 4 | Verify email | `User implements MustVerifyEmail`, `EmailVerificationController`, `routes /auth/email/verify*` with `signed` + `verified` middleware on dashboard | Link sent via `sendEmailVerificationNotification()`; audit `email_verified_at` |
+| 4 | Verify email (removed) | Email verification deleted at user request: `MustVerifyEmail` contract, `EmailVerificationController`, `/auth/email/verify*` routes, and `verified` middleware on dashboard all removed | `email_verified_at` column retained but no endpoint enforces it; re-add via `middleware('verified')` if needed |
 | 5 | Hash passwords securely | `User casts password=>hashed`, `BCRYPT_ROUNDS=12`, `UserFactory` uses `Hash::make` | Never plaintext; argon2/bcrypt, env tunable |
 | 6 | Tokens out of localStorage | `apps/web/src/app/core/auth/auth-session.store.ts` (in-memory only), backend sets `refresh_token` as `httpOnly, Secure, SameSite=Lax` cookie (`AuthController::login`), refresh reads cookie (`withCredentials`) | XSS cannot exfiltrate httpOnly cookie; access token 15m short-lived |
 | 7 | Server-side API secrets | `backend/.env.example` secrets only in env, `apps/web/.env.example` only `VITE_API_BASE_URL` (non-secret), `config/cors.php` allowlist from env | No `VITE_*` secrets; `inventory.shenodev.tech` single origin |
@@ -30,7 +30,7 @@ Untrusted: HTTP requests, form fields, barcodes, file uploads, webhooks, third-p
 | 19 | Use security skill | `addyosmani/agent-skills@security-and-hardening` installed globally, STRIDE mapped, checklist in `references/hardening-patterns.md` consulted | Threat model first, three-tier boundaries applied |
 
 ## STRIDE quick map
-Spoofing→Sanctum bearer + email verification + webhook HMAC; Tampering→HMAC + parameterized queries; Repudiation→audit `last_login_*` + `AuditController`; Information disclosure→RBAC + redacted logs + CSP; DoS→rate limit + size caps; Elevation→EnsureRole + Policies + RLS.
+Spoofing→Sanctum bearer + webhook HMAC; Tampering→HMAC + parameterized queries; Repudiation→audit `last_login_*` + `AuditController`; Information disclosure→RBAC + redacted logs + CSP; DoS→rate limit + size caps; Elevation→EnsureRole + Policies + RLS.
 
 ## Verification
 - `npm test` — 25 tests pass (no auth bypass)
