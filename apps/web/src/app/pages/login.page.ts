@@ -88,7 +88,7 @@ const DEMO_PASSWORD = 'password';
           </div>
 
           <h2 class="mt-6 font-heading text-[22px] font-semibold tracking-tight text-white">Sign in</h2>
-          <p class="mt-1 text-sm text-slate-400">Warehouse & order management · demo access below</p>
+          <p class="mt-1 text-sm text-slate-400">Warehouse & order management · demo credentials pre-filled</p>
 
           @if (sessionExpired) {
             <p class="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-200" role="status">
@@ -137,10 +137,6 @@ const DEMO_PASSWORD = 'password';
             >
               Login as Demo
             </button>
-
-            <p class="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-center text-xs leading-relaxed text-slate-500">
-              Demo: <span class="font-mono text-slate-300">demo&#64;shenodev.tech</span> · <span class="font-mono text-slate-300">password</span>
-            </p>
             <p class="mt-4 text-center text-[11px] leading-relaxed text-slate-500">
               By signing in you agree to our <a href="/legal/terms" class="underline decoration-white/20 underline-offset-2 hover:text-slate-300">Terms</a> and <a href="/legal/privacy" class="underline decoration-white/20 underline-offset-2 hover:text-slate-300">Privacy</a>. · <a href="/legal/cookies" class="underline decoration-white/20 underline-offset-2 hover:text-slate-300">Cookies</a> · Shenodev, 3 Warehouse Lane, Tallinn 10111, Estonia
             </p>
