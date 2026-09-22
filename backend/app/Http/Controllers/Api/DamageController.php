@@ -95,6 +95,8 @@ class DamageController extends Controller
             ];
         });
 
+        $this->inventory->evaluateLowStock($result['product']);
+
         return response()->json([
             'message' => "{$result['movement']->quantity} damaged units written off for {$result['product']->name}.",
             'damage' => [

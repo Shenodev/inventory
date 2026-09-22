@@ -15,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    public function __construct(private readonly LowStockMonitor $lowStockMonitor) {}
+
     /**
      * @return Collection<int, Product>
      */
@@ -59,6 +61,11 @@ class InventoryService
 
         $updated = $this->withAvailability(Product::query()->whereKey($product->getKey()))->firstOrFail();
 
+        $this->lowStockMonitor->evaluate(
+            $updated,
+            (int) $updated->total_stock - (int) ($updated->reserved_stock ?? 0) - (int) ($updated->sold_stock ?? 0),
+        );
+
         return ['product' => $updated, 'movement' => $movement];
     }
 
@@ -80,6 +87,7 @@ class InventoryService
             'reserved_stock' => $reserved,
             'sold_stock' => $sold,
             'available_stock' => $product->total_stock - $reserved - $sold,
+            'min_stock' => $product->min_stock,
             'location' => $product->location,
             'barcode' => $product->barcode,
         ];
@@ -100,6 +108,15 @@ class InventoryService
             ->sum('quantity');
 
         return $product->total_stock - $reserved - $sold;
+    }
+
+    /**
+     * Recompute availability for a product and run the low-stock alert monitor
+     * against it. Call after any stock mutation that bypasses adjustStock().
+     */
+    public function evaluateLowStock(Product $product): void
+    {
+        $this->lowStockMonitor->evaluate($product, $this->availableQuantity($product));
     }
 
     private function withAvailability(Builder $query): Builder

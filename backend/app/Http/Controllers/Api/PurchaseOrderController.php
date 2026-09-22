@@ -15,6 +15,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\StockMovement;
 use App\Models\Transaction;
+use App\Services\InventoryService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,8 @@ use Illuminate\Validation\ValidationException;
 
 class PurchaseOrderController extends Controller
 {
+    public function __construct(private readonly InventoryService $inventory) {}
+
     public function index(Request $request): JsonResponse
     {
         $status = $request->string('status')->trim()->toString() ?: null;
@@ -259,6 +262,11 @@ class PurchaseOrderController extends Controller
         });
 
         $received->load(['supplier:id,name', 'items.product:id,sku,name', 'transactions']);
+
+        Product::query()
+            ->whereIn('id', $received->items->pluck('product_id'))
+            ->get()
+            ->each(fn (Product $product): ?bool => $this->inventory->evaluateLowStock($product));
 
         return response()->json([
             'message' => "Purchase order #{$received->id} received.",

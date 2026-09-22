@@ -109,8 +109,19 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', 'hello@contact.inventory.shenodev.tech'),
+        'name' => env('MAIL_FROM_NAME', 'ShenoInventory'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operational Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Recipient for system alerts such as low-stock warnings.
+    |
+    */
+
+    'alerts_to' => env('MAIL_ALERTS_TO', 'admin@contact.inventory.shenodev.tech'),
 
 ];

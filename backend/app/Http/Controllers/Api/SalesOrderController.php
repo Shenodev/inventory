@@ -304,6 +304,11 @@ class SalesOrderController extends Controller
 
         $fulfilled->load(['customer:id,name', 'items.product:id,sku,name', 'transactions']);
 
+        Product::query()
+            ->whereIn('id', $fulfilled->items->pluck('product_id'))
+            ->get()
+            ->each(fn (Product $product): ?bool => $this->inventory->evaluateLowStock($product));
+
         return response()->json([
             'message' => "Sales order #{$fulfilled->id} fulfilled.",
             'sales_order' => $this->present($fulfilled),
@@ -411,6 +416,11 @@ class SalesOrderController extends Controller
         });
 
         $result['sales_order']->load(['customer:id,name', 'items.product:id,sku,name', 'transactions']);
+
+        Product::query()
+            ->whereIn('id', $result['sales_order']->items->pluck('product_id'))
+            ->get()
+            ->each(fn (Product $product): ?bool => $this->inventory->evaluateLowStock($product));
 
         return response()->json([
             'message' => 'Return processed. Refund of '.number_format($result['refund'], 2).' logged against sales order #'.$salesOrder->id.'.',

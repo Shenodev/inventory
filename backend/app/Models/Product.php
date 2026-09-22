@@ -40,8 +40,10 @@ class Product extends Model
         'price',
         'cost',
         'total_stock',
+        'min_stock',
         'location',
         'barcode',
+        'low_stock_notified_at',
     ];
 
     /**
@@ -53,6 +55,8 @@ class Product extends Model
             'price' => 'decimal:2',
             'cost' => 'decimal:2',
             'total_stock' => 'integer',
+            'min_stock' => 'integer',
+            'low_stock_notified_at' => 'datetime',
         ];
     }
 
