@@ -8,8 +8,10 @@ import {
   signal,
 } from '@angular/core';
 import { RouteMeta } from '@analogjs/router';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of, throwError } from 'rxjs';
 
+import { AuthSessionStore } from '../../core/auth/auth-session.store';
+import { canViewFinancials } from '../../core/auth/roles';
 import { DashboardOverview, DashboardService } from '../../core/dashboard/dashboard.service';
 import {
   FinancialOverview,
@@ -73,21 +75,22 @@ interface RecentSale {
     }
 
     <!-- Primary KPI bento -->
-    <section class="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <article class="card-premium group relative overflow-hidden rounded-2xl p-5 transition-all hover:shadow-card-hover">
-        <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.07] via-transparent to-transparent opacity-60"></div>
-        <div class="relative flex items-start justify-between">
-          <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Net Profit</p>
-          <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/10 text-cyan-300">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-[18px] w-[18px]"><path d="M3 17l6-6 4 4 8-8" /><path d="M14 7h7v7" /></svg>
-          </span>
-        </div>
-        <p class="relative mt-4 font-heading text-[28px] font-semibold tracking-tight" [class]="netProfitClass()">{{ netProfit() }}</p>
-        <p class="relative mt-1 text-xs text-slate-500">Income after expenses · margin {{ grossMargin() }}</p>
-        <div class="relative mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
-          <span class="block h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" [style.width]="profitBar()"></span>
-        </div>
-      </article>
+    @if (canViewFinancials()) {
+      <section class="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article class="card-premium group relative overflow-hidden rounded-2xl p-5 transition-all hover:shadow-card-hover">
+          <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/[0.07] via-transparent to-transparent opacity-60"></div>
+          <div class="relative flex items-start justify-between">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Net Profit</p>
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/15 bg-cyan-400/10 text-cyan-300">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-[18px] w-[18px]"><path d="M3 17l6-6 4 4 8-8" /><path d="M14 7h7v7" /></svg>
+            </span>
+          </div>
+          <p class="relative mt-4 font-heading text-[28px] font-semibold tracking-tight" [class]="netProfitClass()">{{ netProfit() }}</p>
+          <p class="relative mt-1 text-xs text-slate-500">Income after expenses · margin {{ grossMargin() }}</p>
+          <div class="relative mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
+            <span class="block h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" [style.width]="profitBar()"></span>
+          </div>
+        </article>
 
       <article class="card-premium group relative overflow-hidden rounded-2xl p-5 transition-all hover:shadow-card-hover">
         <div class="absolute inset-0 bg-gradient-to-br from-blue-500/[0.06] via-transparent to-transparent opacity-60"></div>
@@ -129,12 +132,13 @@ interface RecentSale {
         </div>
         <p class="relative mt-4 font-heading text-[28px] font-semibold tracking-tight text-white">{{ inventoryValuation() }}</p>
         <p class="relative mt-1 text-xs text-slate-500">Stock at cost · {{ totalInventory() }} units</p>
-        <div class="relative mt-3 flex items-center gap-2 text-[11px] text-slate-500">
-          <span class="h-px flex-1 bg-white/10"></span>
-          Aisle-accurate
-        </div>
-      </article>
-    </section>
+          <div class="relative mt-3 flex items-center gap-2 text-[11px] text-slate-500">
+            <span class="h-px flex-1 bg-white/10"></span>
+            Aisle-accurate
+          </div>
+        </article>
+      </section>
+    }
 
     <!-- Secondary metrics -->
     <section class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -161,27 +165,29 @@ interface RecentSale {
         </span>
       </article>
 
-      <article class="flex items-center gap-4 rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4 backdrop-blur">
-        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-5 w-5"><path d="M3 12a9 9 0 103-6.7L3 8M3 3v5h5" /></svg>
-        </span>
-        <span class="min-w-0">
-          <span class="block text-[11px] font-semibold uppercase tracking-widest text-amber-300/80">Units returned</span>
-          <span class="block font-heading text-xl font-semibold text-amber-300">{{ unitsReturned() }}</span>
-          <span class="block text-xs text-amber-200/60">Restored to stock</span>
-        </span>
-      </article>
+      @if (canViewFinancials()) {
+        <article class="flex items-center gap-4 rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4 backdrop-blur">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-5 w-5"><path d="M3 12a9 9 0 103-6.7L3 8M3 3v5h5" /></svg>
+          </span>
+          <span class="min-w-0">
+            <span class="block text-[11px] font-semibold uppercase tracking-widest text-amber-300/80">Units returned</span>
+            <span class="block font-heading text-xl font-semibold text-amber-300">{{ unitsReturned() }}</span>
+            <span class="block text-xs text-amber-200/60">Restored to stock</span>
+          </span>
+        </article>
 
-      <article class="flex items-center gap-4 rounded-2xl border border-red-400/15 bg-red-400/10 p-4 backdrop-blur">
-        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-400/15 text-red-300">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-5 w-5"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0ZM12 9v4M12 17h.01" /></svg>
-        </span>
-        <span class="min-w-0">
-          <span class="block text-[11px] font-semibold uppercase tracking-widest text-red-300/80">Damaged</span>
-          <span class="block font-heading text-xl font-semibold text-red-300">{{ damagedUnits() }}</span>
-          <span class="block text-xs text-red-200/60">Write-offs</span>
-        </span>
-      </article>
+        <article class="flex items-center gap-4 rounded-2xl border border-red-400/15 bg-red-400/10 p-4 backdrop-blur">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-400/15 text-red-300">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-5 w-5"><path d="M10.3 3.9 1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0ZM12 9v4M12 17h.01" /></svg>
+          </span>
+          <span class="min-w-0">
+            <span class="block text-[11px] font-semibold uppercase tracking-widest text-red-300/80">Damaged</span>
+            <span class="block font-heading text-xl font-semibold text-red-300">{{ damagedUnits() }}</span>
+            <span class="block text-xs text-red-200/60">Write-offs</span>
+          </span>
+        </article>
+      }
     </section>
 
     <!-- Recent sales + Ops hint -->
@@ -239,6 +245,7 @@ interface RecentSale {
   `,
 })
 export default class DashboardPage {
+  private readonly session = inject(AuthSessionStore);
   private readonly dashboard = inject(DashboardService);
   private readonly financials = inject(FinancialsService);
 
@@ -246,6 +253,7 @@ export default class DashboardPage {
   protected readonly financialOverview = signal<FinancialOverview | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly canViewFinancials = computed(() => canViewFinancials(this.session.user()?.role));
 
   protected readonly netProfit = computed(() => {
     const overview = this.financialOverview();
@@ -339,13 +347,25 @@ export default class DashboardPage {
     this.loading.set(true);
     this.error.set(null);
 
+    // Financial overview is manager/admin-only (backend FinancialPolicy); skip
+    // it entirely for other roles so a 403 can't take the whole dashboard down.
+    // A 403 (e.g. role drift between local session and server) degrades to an
+    // empty financial section instead of killing the operational dashboard.
+    const financials = this.canViewFinancials()
+      ? this.financials.getOverview(force).pipe(
+          catchError((error: unknown) =>
+            error instanceof HttpErrorResponse && error.status === 403 ? of(null) : throwError(() => error)
+          ),
+        )
+      : of(null);
+
     forkJoin({
       overview: this.dashboard.getOverview(force),
-      financials: this.financials.getOverview(force),
+      financials,
     }).subscribe({
-      next: ({ overview, financials }) => {
+      next: ({ overview, financials: fin }) => {
         this.overview.set(overview);
-        this.financialOverview.set(financials);
+        this.financialOverview.set(fin);
         this.loading.set(false);
       },
       error: (error: unknown) => {

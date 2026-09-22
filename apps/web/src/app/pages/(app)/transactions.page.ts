@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { RouteMeta } from '@analogjs/router';
 
+import { roleGuard } from '../../core/auth/role.guard';
 import {
   FinancialsService,
   FinancialTransaction,
@@ -17,6 +18,8 @@ import { formatCurrency, formatDate } from '../../core/format';
 
 export const routeMeta: RouteMeta = {
   title: 'Transactions · ShenoInventory',
+  canActivate: [roleGuard],
+  data: { roles: ['admin', 'manager'] },
 };
 
 const referenceLabels: Record<string, string> = {
@@ -297,6 +300,10 @@ export default class TransactionsPage {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 401) {
         return 'Your session expired. Please sign in again.';
+      }
+
+      if (error.status === 403) {
+        return 'Your role does not have access to financial transactions.';
       }
 
       if (error.status === 0) {

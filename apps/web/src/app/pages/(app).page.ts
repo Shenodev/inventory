@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, afterNextRender, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { RouteMeta } from '@analogjs/router';
 
 import { authGuard } from '../core/auth/auth.guard';
 import { AuthService } from '../core/auth/auth.service';
+import { canViewFinancials } from '../core/auth/roles';
 import { ToastService } from '../core/ui/toast.service';
 
 export const routeMeta: RouteMeta = {
@@ -105,7 +106,7 @@ const NAV_SECTIONS: NavSection[] = [
         </div>
 
         <nav class="mt-2 flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2">
-          @for (section of navSections; track section.label; let index = $index) {
+          @for (section of navSections(); track section.label; let index = $index) {
             <p class="mb-2 mt-5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               {{ section.label }}
             </p>
@@ -169,7 +170,7 @@ const NAV_SECTIONS: NavSection[] = [
               <span class="font-heading text-[15px] font-semibold text-white">ShenoInventory</span>
             </a>
             <nav class="mt-6 flex flex-1 flex-col gap-1 overflow-y-auto">
-              @for (section of navSections; track section.label) {
+              @for (section of navSections(); track section.label) {
                 <p class="mt-4 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ section.label }}</p>
                 @for (link of section.links; track link.route) {
                   <a [routerLink]="link.route" (click)="mobileOpen.set(false)" routerLinkActive="bg-white/[0.07] text-white" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/[0.04] hover:text-slate-200">
@@ -262,9 +263,14 @@ export default class AppShell {
   private readonly toaster = inject(ToastService);
 
   protected readonly mobileOpen = signal(false);
-  protected readonly navSections = NAV_SECTIONS;
+  protected readonly navSections = computed(() =>
+    this.canViewFinancials()
+      ? NAV_SECTIONS
+      : NAV_SECTIONS.filter((section) => section.label !== 'Ledger')
+  );
   protected readonly user = this.auth.currentUser;
   protected readonly toasts = this.toaster.toasts;
+  private readonly canViewFinancials = computed(() => canViewFinancials(this.user()?.role));
 
   protected initials(): string {
     const name = this.user()?.name ?? 'Demo User';
