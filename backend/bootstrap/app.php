@@ -49,14 +49,19 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*')) {
                 $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
                 if ($status >= 500) {
-                    Log::error('Unhandled exception', [
-                        'class' => get_class($e),
-                        'exception' => $e->getMessage(),
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine(),
-                        'path' => $request->path(),
-                        // never log sensitive payload
-                    ]);
+                    try {
+                        Log::error('Unhandled exception', [
+                            'class' => get_class($e),
+                            'exception' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                            'path' => $request->path(),
+                            // never log sensitive payload
+                        ]);
+                    } catch (Throwable $logError) {
+                        // A broken log channel must never supersede the real
+                        // error response or mask the original exception.
+                    }
 
                     return response()->json(['message' => 'Internal server error.'], 500);
                 }

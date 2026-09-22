@@ -47,9 +47,11 @@ $env('APP_ROUTES_CACHE', '/tmp/cache/routes.php');
 $env('APP_SERVICES_CACHE', '/tmp/cache/services.php');
 $env('VIEW_COMPILED_PATH', '/tmp/cache/views');
 
-// A file log channel cannot work on the read-only filesystem, and stderr is
-// what reaches the function logs.
-$env('LOG_CHANNEL', 'stderr', force: true);
+// A file log channel cannot work on the read-only filesystem. Use the SAPI
+// error log (error_log) which the Vercel runtime forwards to function logs:
+// the "stderr" channel relies on php://stderr which is unavailable in this
+// SAPI (StreamHandler cannot open it), so every Log call would throw.
+$env('LOG_CHANNEL', 'errorlog', force: true);
 
 // Never render framework stack traces to API clients.
 $env('APP_DEBUG', 'false', force: true);
@@ -64,14 +66,25 @@ error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
 // Capture any fatal that bypasses Laravel's handler (they would otherwise be
 // replaced by Vercel's runtime with a bare JSON 500 and no diagnostics).
-register_shutdown_function(function (): void {
+$writeErr = static function (string $line): void {
+    $handle = @fopen('php://stderr', 'a');
+
+    if ($handle === false) {
+        return;
+    }
+
+    fwrite($handle, $line);
+    fclose($handle);
+};
+
+register_shutdown_function(function () use ($writeErr): void {
     $error = error_get_last();
 
     if ($error === null || ! in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
         return;
     }
 
-    fwrite(STDERR, sprintf(
+    $writeErr(sprintf(
         "FATAL %s in %s on line %d\n",
         $error['message'],
         $error['file'],
@@ -79,14 +92,14 @@ register_shutdown_function(function (): void {
     ));
 });
 
-set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
+set_error_handler(function (int $severity, string $message, string $file, int $line) use ($writeErr): bool {
     $mask = E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR;
 
     if (($severity & $mask) === 0) {
         return false;
     }
 
-    fwrite(STDERR, sprintf("PHP ERROR [%d] %s in %s on line %d\n", $severity, $message, $file, $line));
+    $writeErr(sprintf("PHP ERROR [%d] %s in %s on line %d\n", $severity, $message, $file, $line));
 
     return false;
 });
