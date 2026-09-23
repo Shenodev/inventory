@@ -153,14 +153,13 @@ interface EditorState {
                 </td>
                 <td class="px-6 py-4">
                   <select
-                    [value]="user.role"
                     [disabled]="user.id === currentUserId() || roleSaving() !== null"
                     (change)="onRoleChange($event, user)"
                     aria-label="Change role for {{ user.name }}"
                     class="rounded-xl border border-white/10 bg-deep-slate px-3 py-1.5 text-sm font-medium text-slate-200 outline-none focus:border-electric-cyan disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     @for (role of allRoles; track role) {
-                      <option [value]="role">{{ roleLabel(role) }}</option>
+                      <option [value]="role" [selected]="user.role === role">{{ roleLabel(role) }}</option>
                     }
                   </select>
                 </td>
