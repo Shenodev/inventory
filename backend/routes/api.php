@@ -90,6 +90,7 @@ Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(f
         Route::get('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
         Route::post('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'store']);
         Route::patch('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'update']);
+        Route::delete('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'destroy']);
         Route::patch('/users/{user}/role', [\App\Http\Controllers\Api\Admin\UserController::class, 'updateRole']);
         Route::get('/audit', [\App\Http\Controllers\Api\Admin\AuditController::class, 'index']);
     });

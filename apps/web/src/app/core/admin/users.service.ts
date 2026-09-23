@@ -62,4 +62,12 @@ export class AdminUsersService {
   updateRole(userId: number, role: string): Observable<RoleResponse> {
     return this.http.patch<RoleResponse>(`${API_BASE_URL}/admin/users/${userId}/role`, { role });
   }
+
+  destroy(userId: number): Observable<MessageResponse> {
+    return this.http.delete<MessageResponse>(`${API_BASE_URL}/admin/users/${userId}`);
+  }
+}
+
+export interface MessageResponse {
+  message: string;
 }

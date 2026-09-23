@@ -107,6 +107,22 @@ class UserController extends Controller
         ]);
     }
 
+    public function destroy(Request $request, User $user): JsonResponse
+    {
+        // Prevent self-deletion lockout: the signed-in admin must stay able to
+        // administer the account they are signed in with.
+        if ($request->user()?->id === $user->id) {
+            return response()->json(
+                ['message' => 'You cannot delete your own account while signed in.'],
+                JsonResponse::HTTP_UNPROCESSABLE_ENTITY,
+            );
+        }
+
+        $user->delete();
+
+        return response()->json(['message' => 'User deleted.']);
+    }
+
     /**
      * @return array{id: int, name: string, email: string, role: string, created_at: string|null}
      */

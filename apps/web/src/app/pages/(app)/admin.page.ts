@@ -176,6 +176,14 @@ interface EditorState {
                     >
                       Edit
                     </button>
+                    <button
+                      type="button"
+                      (click)="requestDelete(user)"
+                      [disabled]="user.id === currentUserId()"
+                      class="rounded-xl border border-white/10 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-red-400/40 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -330,6 +338,54 @@ interface EditorState {
         </div>
       </div>
     }
+
+    @if (deleteTarget(); as user) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
+        (click)="cancelDelete()"
+      >
+        <div
+          class="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6 text-left"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-user-title"
+          (click)="$event.stopPropagation()"
+        >
+          <h2 id="delete-user-title" class="font-heading text-lg font-semibold text-white">
+            Delete {{ user.name }}?
+          </h2>
+          <p class="mt-2 text-sm text-slate-400">
+            This permanently removes the account ({{ user.email }}). The user can no longer sign in, and their access tokens are revoked.
+          </p>
+          @if (formError(); as message) {
+            <p
+              class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+              role="alert"
+            >
+              {{ message }}
+            </p>
+          }
+          <div class="mt-6 flex gap-3">
+            <button
+              type="button"
+              (click)="cancelDelete()"
+              [disabled]="saving()"
+              class="flex-1 rounded-xl border border-white/10 px-4 py-3 font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-60"
+            >
+              Keep user
+            </button>
+            <button
+              type="button"
+              (click)="confirmDelete()"
+              [disabled]="saving() || user.id === currentUserId()"
+              class="flex-1 rounded-xl bg-red-500/90 px-4 py-3 font-medium text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ saving() ? 'Deleting…' : 'Delete user' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export default class AdminPage {
@@ -352,6 +408,7 @@ export default class AdminPage {
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
   protected readonly roleSaving = signal<number | null>(null);
+  protected readonly deleteTarget = signal<AdminUser | null>(null);
 
   protected readonly form = this.formBuilder.group({
     name: this.formBuilder.control('', [Validators.required, Validators.maxLength(120)]),
@@ -384,6 +441,7 @@ export default class AdminPage {
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
     this.closeEditor();
+    this.cancelDelete();
   }
 
   protected load(force = false): void {
@@ -525,6 +583,47 @@ export default class AdminPage {
       error: (error: unknown) => {
         this.saving.set(false);
         this.formError.set(this.messageFor(error, 'Unable to save the user right now.'));
+      },
+    });
+  }
+
+  protected requestDelete(user: AdminUser): void {
+    if (user.id === this.currentUserId()) {
+      return;
+    }
+
+    this.formError.set(null);
+    this.deleteTarget.set(user);
+  }
+
+  protected cancelDelete(): void {
+    if (this.saving()) {
+      return;
+    }
+
+    this.deleteTarget.set(null);
+  }
+
+  protected confirmDelete(): void {
+    const user = this.deleteTarget();
+
+    if (user === null || this.saving() || user.id === this.currentUserId()) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.formError.set(null);
+
+    this.usersService.destroy(user.id).subscribe({
+      next: ({ message }) => {
+        this.saving.set(false);
+        this.deleteTarget.set(null);
+        this.users.update((list) => list.filter((item) => item.id !== user.id));
+        this.notice.set(message);
+      },
+      error: (error: unknown) => {
+        this.saving.set(false);
+        this.formError.set(this.messageFor(error, 'Unable to delete the user right now.'));
       },
     });
   }
