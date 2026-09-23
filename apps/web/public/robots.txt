@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /login
+Allow: /legal/
+Allow: /og-image.png
+Allow: /favicon.ico
+Allow: /favicon-*.png
+
+# The core product is a signed-in warehouse OS — no crawling value inside it.
+Disallow: /products
+Disallow: /purchase-orders
+Disallow: /damages
+Disallow: /customers
+Disallow: /returns
+Disallow: /suppliers
+Disallow: /transactions
+Disallow: /admin
+
+Sitemap: https://inventory.shenodev.tech/sitemap.xml

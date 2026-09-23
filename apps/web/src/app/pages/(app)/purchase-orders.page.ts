@@ -32,6 +32,12 @@ import { BarcodeScannerComponent } from '../../shared/barcode-scanner.component'
 
 export const routeMeta: RouteMeta = {
   title: 'Purchase Orders · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Purchase orders — order stock from suppliers, track pending value and receive shipments.',
+    },
+  ],
 };
 
 type Tab = 'all' | PurchaseOrderStatus;

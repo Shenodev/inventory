@@ -67,7 +67,6 @@ describe('authInterceptor', () => {
   it('refreshes the access token and retries the request when the API rejects it', () => {
     const { http, controller, session } = setupInterceptors();
     session.setToken('stale-token');
-    session.setRefreshToken('refresh-456');
     session.setUser({ id: 1, name: 'Demo User', email: 'demo@shenodev.tech' });
 
     let received: unknown;
@@ -80,7 +79,8 @@ describe('authInterceptor', () => {
       .flush({ message: 'Unauthenticated.' }, { status: 401, statusText: 'Unauthorized' });
 
     const refreshRequest = controller.expectOne(REFRESH_URL);
-    expect(refreshRequest.request.body).toEqual({ refresh_token: 'refresh-456' });
+    // Refresh token lives in the httpOnly cookie only — body stays empty.
+    expect(refreshRequest.request.body).toEqual({});
     expect(refreshRequest.request.headers.has('Authorization')).toBe(false);
     refreshRequest.flush({ access_token: 'fresh-token' });
 
@@ -90,7 +90,6 @@ describe('authInterceptor', () => {
 
     expect(received).toEqual({ ok: true });
     expect(session.token()).toBe('fresh-token');
-    expect(session.refreshToken()).toBe('refresh-456');
     expect(session.user()).not.toBeNull();
 
     controller.verify();
@@ -107,7 +106,6 @@ describe('authInterceptor', () => {
       .flush({ message: 'Unauthenticated.' }, { status: 401, statusText: 'Unauthorized' });
 
     expect(session.token()).toBeNull();
-    expect(session.refreshToken()).toBeNull();
     expect(session.user()).toBeNull();
     expect(navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { session: 'expired' },
@@ -138,7 +136,6 @@ describe('authInterceptor', () => {
     );
 
     expect(session.token()).toBeNull();
-    expect(session.refreshToken()).toBeNull();
     expect(session.user()).toBeNull();
     expect(navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { session: 'expired' },
@@ -150,7 +147,7 @@ describe('authInterceptor', () => {
   it('dedupes concurrent 401s onto one refresh exchange', () => {
     const { http, controller, session } = setupInterceptors();
     session.setToken('stale-token');
-    session.setRefreshToken('refresh-456');
+    session.setUser({ id: 1, name: 'Demo User', email: 'demo@shenodev.tech' });
 
     http.get('/api/dashboard').subscribe();
     http.get('/api/products').subscribe();
@@ -181,7 +178,6 @@ describe('authInterceptor', () => {
     const { http, controller, session } = setupInterceptors();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     session.setToken('stale-token');
-    session.setRefreshToken('refresh-456');
     session.setUser({ id: 1, name: 'Demo User', email: 'demo@shenodev.tech' });
 
     http.get('/api/dashboard').subscribe({ error: () => undefined });
@@ -194,7 +190,6 @@ describe('authInterceptor', () => {
       .flush({ message: 'The refresh token is invalid.' }, { status: 401, statusText: 'Unauthorized' });
 
     expect(session.token()).toBeNull();
-    expect(session.refreshToken()).toBeNull();
     expect(session.user()).toBeNull();
     expect(navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { session: 'expired' },
@@ -216,6 +211,55 @@ describe('authInterceptor', () => {
 
     expect(navigate).not.toHaveBeenCalled();
     expect(session.token()).toBeNull();
+
+    controller.verify();
+  });
+
+  it('refreshes from the cookie BEFORE a reload-cold request so no 401 probe is logged', () => {
+    const { http, controller, session } = setupInterceptors();
+    // Persisted user survives the reload, in-memory token does not.
+    session.setUser({ id: 1, name: 'Demo User', email: 'demo@shenodev.tech' });
+
+    let received: unknown;
+    http.get('/api/dashboard').subscribe((body) => {
+      received = body;
+    });
+
+    const refreshRequest = controller.expectOne(REFRESH_URL);
+    expect(refreshRequest.request.body).toEqual({});
+    expect(refreshRequest.request.headers.has('Authorization')).toBe(false);
+    refreshRequest.flush({ access_token: 'fresh-token' });
+
+    const apiRequest = controller.expectOne('/api/dashboard');
+    expect(apiRequest.request.headers.get('Authorization')).toBe('Bearer fresh-token');
+    apiRequest.flush({ ok: true });
+
+    expect(received).toEqual({ ok: true });
+    expect(session.token()).toBe('fresh-token');
+
+    controller.verify();
+  });
+
+  it('signs out without firing the guarded request when the reload refresh fails', () => {
+    const { http, controller, session } = setupInterceptors();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    session.setUser({ id: 1, name: 'Demo User', email: 'demo@shenodev.tech' });
+
+    let errored = false;
+    http.get('/api/dashboard').subscribe({ error: () => (errored = true) });
+
+    const refreshRequest = controller.expectOne(REFRESH_URL);
+    refreshRequest.flush(
+      { message: 'The refresh token is invalid.' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    expect(errored).toBe(true);
+    expect(session.token()).toBeNull();
+    expect(session.user()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { session: 'expired' },
+    });
 
     controller.verify();
   });

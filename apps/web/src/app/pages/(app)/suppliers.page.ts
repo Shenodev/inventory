@@ -17,6 +17,12 @@ import { Supplier, SuppliersService } from '../../core/procurement/suppliers.ser
 
 export const routeMeta: RouteMeta = {
   title: 'Suppliers · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Suppliers — the purchasing network with purchase-order history per vendor.',
+    },
+  ],
 };
 
 const PAGE_SIZE = 50;

@@ -9,7 +9,6 @@ export type { AuthenticatedUser } from './auth-session.store';
 
 export interface LoginResponse {
   access_token: string;
-  refresh_token: string;
   token_type: string;
   expires_in: number;
   user: AuthenticatedUser;
@@ -45,16 +44,13 @@ export class AuthService {
       return of(null);
     }
 
-    const body: Record<string, string> = {};
-    const rt = this.session.refreshToken();
-    if (rt) body['refresh_token'] = rt;
-
+    // Refresh token lives only in an httpOnly cookie set by the API — the body
+    // stays empty and withCredentials carries the cookie. JS never touches it.
     this.refreshInFlight = this.http
-      .post<LoginResponse>(`${API_BASE_URL}/auth/refresh`, body, { withCredentials: true })
+      .post<LoginResponse>(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
       .pipe(
         tap((response) => {
           this.session.setToken(response.access_token);
-          if (response.refresh_token) this.session.setRefreshToken(response.refresh_token);
         }),
         finalize(() => (this.refreshInFlight = null)),
         // Multicast so every concurrent 401 handler subscribes to the SAME exchange.
@@ -71,8 +67,7 @@ export class AuthService {
       .pipe(
         tap((response) => {
           this.session.setToken(response.access_token);
-          // refresh_token is also set as httpOnly cookie server-side; keep in memory as fallback
-          this.session.setRefreshToken(response.refresh_token);
+          // refresh token stays server-side only (httpOnly cookie) — never in JS
           this.session.setUser(response.user);
         })
       );

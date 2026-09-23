@@ -16,6 +16,12 @@ import { DamageEntry, ProductsService } from '../../core/products/products.servi
 
 export const routeMeta: RouteMeta = {
   title: 'Damages · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Damages — write-offs of broken or unusable stock, valued at cost, with reversal.',
+    },
+  ],
 };
 
 @Component({
@@ -149,7 +155,7 @@ export const routeMeta: RouteMeta = {
                     (click)="requestReverse(entry)"
                     class="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
                   >
-                    Not damaged
+                    Report as found
                   </button>
                 </td>
               </tr>

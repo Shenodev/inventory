@@ -91,8 +91,6 @@ class AuthController extends Controller
 
         $response = response()->json([
             'access_token' => $accessToken->plainTextToken,
-            // refresh_token still returned for legacy/mobile clients, but also set as httpOnly cookie
-            'refresh_token' => $refreshToken->plainTextToken,
             'token_type' => 'Bearer',
             'expires_in' => self::ACCESS_TOKEN_TTL_MINUTES * 60,
             'user' => [
@@ -124,8 +122,9 @@ class AuthController extends Controller
 
     public function refresh(Request $request): JsonResponse
     {
-        // Prefer httpOnly cookie, fallback to body for backward compat
-        $refreshToken = $request->cookie('refresh_token') ?? $request->string('refresh_token')->toString();
+        // Refresh token lives only in the httpOnly cookie (login no longer returns
+        // it in the body), so a compromised XSS cannot exfiltrate it.
+        $refreshToken = $request->cookie('refresh_token');
         $refreshToken = is_string($refreshToken) ? trim($refreshToken) : '';
 
         $token = PersonalAccessToken::findToken($refreshToken);
@@ -177,7 +176,6 @@ class AuthController extends Controller
 
         $response = response()->json([
             'access_token' => $accessToken->plainTextToken,
-            'refresh_token' => $newRefreshToken->plainTextToken,
             'token_type' => 'Bearer',
             'expires_in' => self::ACCESS_TOKEN_TTL_MINUTES * 60,
         ]);

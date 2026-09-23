@@ -21,6 +21,7 @@ Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('th
 
 // Public but rate-limited: data-deletion & unsubscribe (GDPR)
 Route::post('/account/data-request', [AccountController::class, 'dataRequest'])->middleware('throttle:api');
+Route::match(['get', 'post'], '/account/data-request/confirm', [AccountController::class, 'confirm'])->middleware('throttle:api');
 Route::match(['get', 'post'], '/unsubscribe', [AccountController::class, 'unsubscribe'])->middleware('throttle:api');
 
 // Webhooks — always signature-verified, rate-limited

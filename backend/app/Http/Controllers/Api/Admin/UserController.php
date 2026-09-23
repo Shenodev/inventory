@@ -118,6 +118,10 @@ class UserController extends Controller
             );
         }
 
+        // Drop the user's Sanctum tokens (they would otherwise orphan rows whose
+        // tokenable no longer resolves), then delete the account.
+        $user->tokens()->delete();
+
         $user->delete();
 
         return response()->json(['message' => 'User deleted.']);

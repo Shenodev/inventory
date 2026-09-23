@@ -244,4 +244,38 @@ describe('ProductsPage', () => {
     });
     expect(native.textContent).toContain('3 damaged units written off for Demo Widget.');
   });
+
+  it('reports a product as lost with a preselected product and stocktake reason', () => {
+    const fixture = TestBed.createComponent(ProductsPage);
+    const component = fixture.componentInstance as unknown as ProductsPageInternals;
+    const service = TestBed.inject(ProductsService);
+    const reportDamageSpy = vi.spyOn(service, 'reportDamage');
+
+    component.load();
+    fixture.detectChanges();
+
+    const native = fixture.nativeElement as HTMLElement;
+    const reportLost = Array.from(native.querySelectorAll('button')).find((element) =>
+      element.textContent?.includes('Report as lost')
+    );
+
+    expect(reportLost).toBeTruthy();
+    reportLost?.click();
+    fixture.detectChanges();
+
+    const dialog = native.querySelector('[role="dialog"]');
+    expect(dialog?.textContent ?? '').toContain('Report as lost');
+
+    const writeOff = Array.from(dialog?.querySelectorAll('button') ?? []).find((element) =>
+      element.textContent?.includes('Write off')
+    );
+    writeOff?.click();
+    fixture.detectChanges();
+
+    expect(reportDamageSpy).toHaveBeenCalledWith({
+      product_id: 1,
+      quantity: 1,
+      reason: 'Marked as lost during stocktake',
+    });
+  });
 });

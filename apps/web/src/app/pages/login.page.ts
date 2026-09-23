@@ -17,6 +17,12 @@ import { AuthService } from '../core/auth/auth.service';
 
 export const routeMeta: RouteMeta = {
   title: 'Sign in · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Sign in to ShenoInventory — barcode-native warehouse operations with Aisle/Bay/Shelf-accurate inventory and live valuation.',
+    },
+  ],
 };
 
 const DEMO_EMAIL = 'demo@shenodev.tech';
@@ -73,7 +79,7 @@ const DEMO_PASSWORD = 'password';
           </div>
         </div>
 
-        <p class="text-xs text-slate-600">Trusted by ops teams · Sanctum-secured · Live sync</p>
+        <p class="text-xs text-slate-600">Built for ops teams · Sanctum-secured · Live sync</p>
       </div>
 
       <!-- Right form -->

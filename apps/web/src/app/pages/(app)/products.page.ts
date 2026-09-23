@@ -25,6 +25,12 @@ import { BarcodeScannerComponent } from '../../shared/barcode-scanner.component'
 
 export const routeMeta: RouteMeta = {
   title: 'Products · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Products — barcode-native catalog with Aisle/Bay/Shelf locations, stock, reservations and reorder points.',
+    },
+  ],
 };
 
 const PAGE_SIZE = 50;
@@ -269,6 +275,13 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                       class="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
                     >
                       Location
+                    </button>
+                    <button
+                      type="button"
+                      (click)="openLost(product)"
+                      class="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-1.5 text-xs font-medium text-red-300 transition-colors hover:bg-red-400/20"
+                    >
+                      Report as lost
                     </button>
                     <button
                       type="button"
@@ -519,10 +532,12 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
           <div class="flex items-start justify-between gap-4">
             <div>
               <h2 id="report-damage-title" class="font-heading text-lg font-semibold text-white">
-                Report damage
+                {{ damageMode() === 'lost' ? 'Report as lost' : 'Report damage' }}
               </h2>
               <p class="mt-1 text-sm text-slate-400">
-                Write off broken or unusable stock. Scan barcode or select product.
+                {{ damageMode() === 'lost'
+                  ? 'Write off missing stock — item never found after a count.'
+                  : 'Write off broken or unusable stock. Scan barcode or select product.' }}
               </p>
             </div>
             <button
@@ -591,7 +606,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
               rows="2"
               maxlength="500"
               formControlName="reason"
-              placeholder="e.g. Cracked during unload"
+              [placeholder]="damageMode() === 'lost' ? 'e.g. Missing after full count' : 'e.g. Cracked during unload'"
               class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
             ></textarea>
 
@@ -648,6 +663,7 @@ export default class ProductsPage {
 
   protected readonly damageOpen = signal(false);
   protected readonly damaging = signal(false);
+  protected readonly damageMode = signal<'damage' | 'lost'>('damage');
 
   protected readonly barcodeNotice = signal<string | null>(null);
   protected readonly barcodeIsError = signal(false);
@@ -948,9 +964,22 @@ export default class ProductsPage {
   }
 
   protected openDamage(): void {
+    this.damageMode.set('damage');
     this.damageForm.reset({ productId: null, quantity: 1, reason: '' });
     this.formError.set(null);
     this.damageOpen.set(true);
+  }
+
+  protected openLost(product: Product): void {
+    this.damageMode.set('lost');
+    this.damageForm.reset({
+      productId: product.id,
+      quantity: 1,
+      reason: 'Marked as lost during stocktake',
+    });
+    this.formError.set(null);
+    this.damageOpen.set(true);
+    this.damageForm.controls.quantity.updateValueAndValidity();
   }
 
   protected closeDamage(): void {

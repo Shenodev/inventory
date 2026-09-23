@@ -21,6 +21,12 @@ import { apiErrorMessage } from '../../core/api-error';
 
 export const routeMeta: RouteMeta = {
   title: 'Users & Roles · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'User management — admin, manager, operator and viewer roles for the workspace.',
+    },
+  ],
   canActivate: [roleGuard],
   data: { roles: ['admin'] },
 };

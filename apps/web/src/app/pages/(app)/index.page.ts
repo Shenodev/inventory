@@ -22,6 +22,12 @@ import { formatCurrency, formatNumber } from '../../core/format';
 
 export const routeMeta: RouteMeta = {
   title: 'Dashboard · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Live warehouse dashboard — net profit, revenue, expenses and aisle-accurate inventory valuation at a glance.',
+    },
+  ],
 };
 
 interface RecentSale {
@@ -234,13 +240,13 @@ interface RecentSale {
 
       <div class="rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-[#111E32] via-[#0F1F36] to-[#0B1224] p-6 shadow-card">
         <p class="text-[11px] font-semibold uppercase tracking-widest text-cyan-300">Warehouse tip</p>
-        <h3 class="mt-2 font-heading text-[16px] font-semibold leading-snug text-white">Scan, don’t select — 3× faster picking.</h3>
+        <h3 class="mt-2 font-heading text-[16px] font-semibold leading-snug text-white">Scan, don’t select — 3× faster picking.*</h3>
         <p class="mt-2 text-[13px] leading-relaxed text-slate-400">Every product now has <span class="font-medium text-slate-200">Aisle/Bay/Shelf</span> location and a scannable <span class="font-mono text-cyan-300">barcode</span>. Use the scanner on Products, Damages and Purchase Orders instead of dropdowns — handheld scanners act as keyboard wedge.</p>
         <div class="mt-4 grid grid-cols-2 gap-2 text-xs">
           <span class="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-slate-300">Aisle 4, Bay 3, Shelf B</span>
           <span class="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 font-mono text-cyan-200">5901234123457</span>
         </div>
-        <p class="mt-3 text-[11px] text-slate-500">Tip: Camera scan works in Chrome/Edge via BarcodeDetector — fallback to input always works.</p>
+        <p class="mt-3 text-[11px] text-slate-500">* Lab estimate vs dropdown selection; your results vary. Camera scan works in Chrome/Edge via BarcodeDetector — fallback to input always works.</p>
       </div>
     </section>
   `,

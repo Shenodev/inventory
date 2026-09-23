@@ -18,6 +18,12 @@ import { formatCurrency, formatDate } from '../../core/format';
 
 export const routeMeta: RouteMeta = {
   title: 'Transactions · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Financial ledger — income, expenses and net balance behind every dashboard number.',
+    },
+  ],
   canActivate: [roleGuard],
   data: { roles: ['admin', 'manager'] },
 };

@@ -7,6 +7,12 @@ import { API_BASE_URL } from '../../core/api.base-url';
 
 export const routeMeta: RouteMeta = {
   title: 'Data Deletion Request · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Request deletion or export of your ShenoInventory data under GDPR.',
+    },
+  ],
 };
 
 @Component({
@@ -16,6 +22,11 @@ export const routeMeta: RouteMeta = {
   template: `
     <div class="mx-auto max-w-3xl px-6 py-10">
       <a routerLink="/login" class="text-sm text-cyan-400 hover:text-cyan-300">← Back to sign in</a>
+      <nav aria-label="Breadcrumb" class="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+        <a routerLink="/login" class="hover:text-cyan-300">Home</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" class="text-slate-300">Legal · Data Deletion Request</span>
+      </nav>
       <h1 class="mt-4 font-heading text-3xl font-semibold tracking-tight text-white">Data deletion request</h1>
       <p class="mt-2 text-sm text-slate-400">Request export or deletion of your tenant’s data. We respond within 30 days.</p>
 

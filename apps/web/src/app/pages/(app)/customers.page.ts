@@ -17,6 +17,12 @@ import { Customer, CustomersService } from '../../core/sales/customers.service';
 
 export const routeMeta: RouteMeta = {
   title: 'Customers · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Customer directory — sales orders placed per buyer and contact details.',
+    },
+  ],
 };
 
 const PAGE_SIZE = 50;

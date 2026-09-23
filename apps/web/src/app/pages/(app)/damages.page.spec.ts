@@ -64,7 +64,7 @@ describe('DamagesPage', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     const buttons = Array.from(el.querySelectorAll('button')) as HTMLButtonElement[];
-    const notDamaged = buttons.find((button) => button.textContent?.trim() === 'Not damaged');
+    const notDamaged = buttons.find((button) => button.textContent?.trim() === 'Report as found');
     expect(notDamaged).toBeDefined();
 
     notDamaged?.click();

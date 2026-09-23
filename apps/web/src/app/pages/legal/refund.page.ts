@@ -4,6 +4,12 @@ import { RouterLink } from '@angular/router';
 
 export const routeMeta: RouteMeta = {
   title: 'Refund Policy · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Refund policy for ShenoInventory — physical goods and SaaS terms, no hidden fees.',
+    },
+  ],
 };
 
 @Component({
@@ -13,6 +19,11 @@ export const routeMeta: RouteMeta = {
   template: `
     <div class="mx-auto max-w-3xl px-6 py-10">
       <a routerLink="/login" class="text-sm text-cyan-400 hover:text-cyan-300">← Back to sign in</a>
+      <nav aria-label="Breadcrumb" class="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+        <a routerLink="/login" class="hover:text-cyan-300">Home</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" class="text-slate-300">Legal · Refund Policy</span>
+      </nav>
       <h1 class="mt-4 font-heading text-3xl font-semibold tracking-tight text-white">Refund & Returns Policy</h1>
       <p class="mt-2 text-sm text-slate-400">Last updated: September 21, 2026 · For B2B inventory operations</p>
 

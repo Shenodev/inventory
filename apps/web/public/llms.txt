@@ -1,0 +1,25 @@
+# ShenoInventory — Warehouse OS
+> Aisle-accurate inventory · barcode-native operations. Built for the floor, not just the desk.
+
+## About
+ShenoInventory is a single-tenant warehouse management system. Products carry
+barcodes and Aisle/Bay/Shelf locations; the dashboard reports net profit,
+revenue, expenses and inventory valuation from a single ledger. Purchase
+orders, damages, returns, customers, suppliers and role-based access are
+covered. Access is sign-in gated (demo account available).
+
+## How
+Open https://inventory.shenodev.tech, sign in with the demo credentials shown
+on the login screen, and use the sidebar:
+- Dashboard — live KPIs: net profit, revenue, expenses, inventory valuation.
+- Products — barcode-native catalog with location, stock, reservations, reorder points.
+- Purchase Orders — order stock from suppliers, receive shipments.
+- Damages — write-offs valued at cost; "Not damaged" reverses a write-off.
+- Customers / Returns / Suppliers — directory data and goods returned to stock.
+- Transactions — the financial ledger behind every dashboard number.
+- Users & Roles — admin/manager/operator/viewer access management.
+
+## Contact
+- Support: support@shenodev.tech
+- Privacy: privacy@shenodev.tech
+- Address: Shenodev, 3 Warehouse Lane, Tallinn 10111, Estonia

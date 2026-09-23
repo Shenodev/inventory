@@ -26,22 +26,14 @@ export class AuthSessionStore {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   // Tokens live only in memory — cleared on tab close / reload is intentional.
   private readonly tokenState = signal<string | null>(null);
-  private readonly refreshTokenState = signal<string | null>(null);
   private readonly userState = signal<AuthenticatedUser | null>(this.readUser());
 
   readonly token = this.tokenState.asReadonly();
-  readonly refreshToken = this.refreshTokenState.asReadonly();
   readonly user = this.userState.asReadonly();
 
   setToken(token: string | null): void {
     this.tokenState.set(token);
     // Intentionally NOT persisted to localStorage (see class doc)
-  }
-
-  setRefreshToken(token: string | null): void {
-    this.refreshTokenState.set(token);
-    // Refresh is httpOnly cookie on server; we keep in memory only for
-    // legacy fallback. Do not persist to localStorage.
   }
 
   setUser(user: AuthenticatedUser | null): void {
@@ -51,7 +43,6 @@ export class AuthSessionStore {
 
   clear(): void {
     this.setToken(null);
-    this.setRefreshToken(null);
     this.setUser(null);
   }
 

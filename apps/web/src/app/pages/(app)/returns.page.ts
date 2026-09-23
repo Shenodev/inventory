@@ -14,6 +14,12 @@ import { SaleReturnEntry, SalesOrdersService } from '../../core/sales/sales-orde
 
 export const routeMeta: RouteMeta = {
   title: 'Returns · ShenoInventory',
+  meta: [
+    {
+      name: 'description',
+      content: 'Returns — goods returned against shipped sales orders, restored to stock.',
+    },
+  ],
 };
 
 @Component({

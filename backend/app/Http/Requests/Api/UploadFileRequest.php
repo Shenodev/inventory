@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api;
 
+use App\Enums\UserRole;
+use App\Models\Product;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\File;
 
@@ -11,7 +13,12 @@ class UploadFileRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('update', \App\Models\Product::class) ?? false;
+        // product-image/uploads are a manager+ action; policy check is model-typed.
+        $user = $this->user();
+
+        return $user !== null
+            && $user->hasRole(UserRole::Manager, UserRole::Admin)
+            && $user->can('update', new Product());
     }
 
     /**
