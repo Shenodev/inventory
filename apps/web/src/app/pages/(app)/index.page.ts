@@ -12,6 +12,7 @@ import { catchError, forkJoin, of, throwError } from 'rxjs';
 
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { canViewFinancials } from '../../core/auth/roles';
+import { apiErrorMessage } from '../../core/api-error';
 import { DashboardOverview, DashboardService } from '../../core/dashboard/dashboard.service';
 import {
   FinancialOverview,
@@ -376,16 +377,6 @@ export default class DashboardPage {
   }
 
   private messageFor(error: unknown): string {
-    if (error instanceof HttpErrorResponse) {
-      if (error.status === 401) {
-        return 'Your session expired. Please sign in again.';
-      }
-
-      if (error.status === 0) {
-        return 'Cannot reach the server. Please try again.';
-      }
-    }
-
-    return 'Unable to load the dashboard right now.';
+    return apiErrorMessage(error, 'Unable to load the dashboard right now.');
   }
 }

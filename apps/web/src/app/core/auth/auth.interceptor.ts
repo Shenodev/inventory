@@ -1,13 +1,10 @@
-import {
-  HttpErrorResponse,
-  HttpClient,
-  HttpInterceptorFn,
-} from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, finalize, Observable, share, switchMap, tap, throwError } from 'rxjs';
+import { catchError, switchMap, throwError } from 'rxjs';
 
 import { API_BASE_URL } from '../api.base-url';
+import { AuthService } from './auth.service';
 import { AuthSessionStore } from './auth-session.store';
 
 const isApiRequest = (url: string): boolean =>
@@ -16,40 +13,15 @@ const isApiRequest = (url: string): boolean =>
 const isAuthRequest = (url: string): boolean =>
   url.endsWith('/auth/login') || url.endsWith('/auth/refresh');
 
-interface RefreshResponse {
-  access_token: string;
-  refresh_token?: string;
-}
-
 /**
- * One refresh call at a time. If several requests get rejected with a 401 while
- * a refresh is already in flight they all wait on the same exchange instead of
- * hammering /auth/refresh with copies of the same token.
+ * A 401 either means the access token expired (refresh silently) or the
+ * session is genuinely dead (show sign-in). We can refresh when an in-memory
+ * refresh token exists OR when an httpOnly refresh cookie may be present —
+ * after a hard reload the in-memory token is gone but the cookie is not, and
+ * that cookie path is what keeps a reload from signing the user out.
  */
-let refreshInFlight: Observable<RefreshResponse> | null = null;
-
-const refreshAccessToken = (
-  http: HttpClient,
-  session: AuthSessionStore
-): Observable<RefreshResponse> => {
-  if (refreshInFlight === null) {
-    // Send refresh via httpOnly cookie (withCredentials) when available;
-    // body fallback for legacy clients that still have token in memory.
-    const body: Record<string, string> = {};
-    const rt = session.refreshToken();
-    if (rt) body['refresh_token'] = rt;
-    refreshInFlight = http
-      .post<RefreshResponse>(`${API_BASE_URL}/auth/refresh`, body, { withCredentials: true })
-      .pipe(
-        // Multicast so every request that got a 401 waits on the single
-        // in-flight exchange instead of each firing its own refresh call.
-        share(),
-        finalize(() => (refreshInFlight = null))
-      );
-  }
-
-  return refreshInFlight;
-};
+const canAttemptRefresh = (session: AuthSessionStore): boolean =>
+  session.refreshToken() !== null || session.hasRefreshCookie();
 
 const endSession = (session: AuthSessionStore, router: Router): void => {
   session.clear();
@@ -59,8 +31,8 @@ const endSession = (session: AuthSessionStore, router: Router): void => {
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const session = inject(AuthSessionStore);
+  const auth = inject(AuthService);
   const router = inject(Router);
-  const http = inject(HttpClient);
   const token = session.token();
 
   // Only attach the bearer token to our own API; never leak it to third
@@ -83,30 +55,31 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
         return throwError(() => error);
       }
 
-      // No refresh token in memory means the session cannot be refreshed;
-      // tokens are intentionally not persisted to localStorage (memory only)
-      // so a page reload loses them and requires re-authentication.
-      if (session.refreshToken() === null) {
+      // No token in memory and no refresh cookie possible — the session cannot
+      // be refreshed, so drop it and route back to sign-in. Tokens are
+      // intentionally memory-only (never localStorage), so a reload relies
+      // entirely on the cookie path below.
+      if (!canAttemptRefresh(session)) {
         endSession(session, router);
 
         return throwError(() => error);
       }
 
-      return refreshAccessToken(http, session).pipe(
-        tap((response) => {
-          session.setToken(response.access_token);
-          // Refresh tokens are rotated server-side; keep the in-memory mirror
-          // in sync so the fallback path never sends a spent token.
-          if (response.refresh_token) session.setRefreshToken(response.refresh_token);
-        }),
-        // Retry the original request with the freshly issued access token.
-        switchMap((response) =>
-          next(
+      // Single-flight silent refresh (AuthService shares one exchange across
+      // every concurrent 401), then retry the original request with the
+      // freshly issued access token. AuthService already stored the tokens.
+      return auth.tryRefresh(true).pipe(
+        switchMap((response) => {
+          if (response === null || response.access_token === '') {
+            return throwError(() => error);
+          }
+
+          return next(
             request.clone({
               setHeaders: { Authorization: `Bearer ${response.access_token}` },
             })
-          )
-        ),
+          );
+        }),
         // If the refresh itself is rejected (stale or revoked refresh token)
         // the session is dead, so drop it and route back to sign-in.
         catchError(() => {

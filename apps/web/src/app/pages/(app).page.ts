@@ -36,6 +36,8 @@ const ICONS = {
     'M3 7h13v10H3ZM16 10h3l2 3v4h-5ZM7.5 17.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM17.5 17.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z',
   purchaseOrders: 'M6 3h8l4 4v14H6V3ZM14 3v4h4M9 12h6M9 16h6',
   transactions: 'M2 8l9-5 9 5-9 5-9-5ZM2 12l9 5 9-5M2 16l9 5 9-5',
+  users:
+    'M12 8a3 3 0 1 0-.001-6.001A3 3 0 0 0 12 8ZM12 10a5 5 0 0 0-5 5v1a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1a5 5 0 0 0-5-5ZM18 11h1a2 2 0 0 1 2 2v3M21 21v-1a4 4 0 0 0-3-3.87',
 } as const;
 
 const NAV_SECTIONS: NavSection[] = [
@@ -67,6 +69,10 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Ledger',
     links: [{ route: '/transactions', label: 'Transactions', icon: ICONS.transactions }],
+  },
+  {
+    label: 'Administration',
+    links: [{ route: '/admin', label: 'Users & Roles', icon: ICONS.users }],
   },
 ];
 
@@ -209,7 +215,7 @@ const NAV_SECTIONS: NavSection[] = [
             <span class="hidden h-6 w-px bg-white/10 sm:block"></span>
             <span class="hidden text-right sm:block">
               <span class="block text-xs font-medium leading-none text-white">{{ user()?.name ?? 'Demo User' }}</span>
-              <span class="block text-[11px] leading-none text-slate-500">Operator</span>
+              <span class="block text-[11px] leading-none text-slate-500">{{ displayRole() }}</span>
             </span>
             <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111E32] text-sm font-semibold text-white ring-1 ring-white/10">{{ initials() }}</span>
           </div>
@@ -263,11 +269,23 @@ export default class AppShell {
   private readonly toaster = inject(ToastService);
 
   protected readonly mobileOpen = signal(false);
-  protected readonly navSections = computed(() =>
-    this.canViewFinancials()
-      ? NAV_SECTIONS
-      : NAV_SECTIONS.filter((section) => section.label !== 'Ledger')
-  );
+  protected readonly navSections = computed(() => {
+    const role = this.user()?.role;
+    const canViewLedger = canViewFinancials(role);
+    const isAdmin = (role ?? '').toLowerCase() === 'admin';
+
+    return NAV_SECTIONS.filter((section) => {
+      if (section.label === 'Ledger') {
+        return canViewLedger;
+      }
+
+      if (section.label === 'Administration') {
+        return isAdmin;
+      }
+
+      return true;
+    });
+  });
   protected readonly user = this.auth.currentUser;
   protected readonly toasts = this.toaster.toasts;
   private readonly canViewFinancials = computed(() => canViewFinancials(this.user()?.role));
@@ -282,14 +300,40 @@ export default class AppShell {
       .join('') || 'DU';
   }
 
+  protected displayRole(): string {
+    const role = this.user()?.role;
+
+    if (role === undefined || role === '') {
+      return 'Operator';
+    }
+
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  }
+
   constructor() {
     afterNextRender(() => this.enforceSession());
   }
 
   private enforceSession(): void {
-    if (!this.auth.isAuthenticated()) {
-      void this.router.navigateByUrl('/login');
+    if (this.auth.isAuthenticated()) {
+      return;
     }
+
+    // An authenticated reload arrives here with its in-memory access token wiped
+    // (memory-only by design). Try to restore the session from the httpOnly
+    // refresh cookie before sending anyone to the sign-in page.
+    this.auth.tryRefresh().subscribe({
+      next: () => {
+        if (!this.auth.isAuthenticated()) {
+          void this.router.navigateByUrl('/login');
+        }
+      },
+      error: () => {
+        this.auth.clearSession();
+
+        void this.router.navigateByUrl('/login');
+      },
+    });
   }
 
   protected dismissToast(id: number): void {

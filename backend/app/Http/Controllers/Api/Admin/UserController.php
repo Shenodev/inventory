@@ -6,9 +6,12 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\StoreAdminUserRequest;
+use App\Http\Requests\Api\UpdateAdminUserRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -25,6 +28,58 @@ class UserController extends Controller
                 'role' => $u->role instanceof UserRole ? $u->role->value : (string) ($u->role ?? UserRole::Operator->value),
                 'created_at' => $u->created_at?->toIso8601String(),
             ]),
+        ]);
+    }
+
+    public function store(StoreAdminUserRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => strtolower(trim($validated['email'])),
+            'password' => Hash::make($validated['password']),
+            'role' => UserRole::from($validated['role']),
+        ]);
+
+        return response()->json([
+            'message' => 'User created.',
+            'user' => $this->present($user),
+        ], JsonResponse::HTTP_CREATED);
+    }
+
+    public function update(UpdateAdminUserRequest $request, User $user): JsonResponse
+    {
+        $validated = $request->validated();
+
+        // Prevent self-demotion / self-disable lockout: the last admin must stay
+        // able to administer. Use an explicit flag so PATCH can still send role.
+        if ($request->user()?->id === $user->id && array_key_exists('role', $validated)) {
+            if ($validated['role'] !== UserRole::Admin->value) {
+                return response()->json(
+                    ['message' => 'You cannot change your own role away from admin while signed in.'],
+                    JsonResponse::HTTP_UNPROCESSABLE_ENTITY,
+                );
+            }
+        }
+
+        if (array_key_exists('name', $validated)) {
+            $user->name = $validated['name'];
+        }
+        if (array_key_exists('email', $validated)) {
+            $user->email = strtolower(trim($validated['email']));
+        }
+        if (array_key_exists('role', $validated)) {
+            $user->role = UserRole::from($validated['role']);
+        }
+        if (! empty($validated['password'])) {
+            $user->password = Hash::make($validated['password']);
+        }
+        $user->save();
+
+        return response()->json([
+            'message' => 'User updated.',
+            'user' => $this->present($user),
         ]);
     }
 
@@ -50,5 +105,19 @@ class UserController extends Controller
                 'role' => $user->role->value,
             ],
         ]);
+    }
+
+    /**
+     * @return array{id: int, name: string, email: string, role: string, created_at: string|null}
+     */
+    private function present(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role instanceof UserRole ? $user->role->value : (string) ($user->role ?? UserRole::Operator->value),
+            'created_at' => $user->created_at?->toIso8601String(),
+        ];
     }
 }

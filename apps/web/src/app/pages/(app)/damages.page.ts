@@ -1,4 +1,3 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -9,6 +8,7 @@ import {
 } from '@angular/core';
 import { RouteMeta } from '@analogjs/router';
 
+import { apiErrorMessage } from '../../core/api-error';
 import { formatCurrency, formatDate, formatNumber } from '../../core/format';
 import { DamageEntry, ProductsService } from '../../core/products/products.service';
 
@@ -228,16 +228,6 @@ export default class DamagesPage {
   }
 
   private messageFor(error: unknown): string {
-    if (error instanceof HttpErrorResponse) {
-      if (error.status === 401) {
-        return 'Your session expired. Please sign in again.';
-      }
-
-      if (error.status === 0) {
-        return 'Cannot reach the server. Please try again.';
-      }
-    }
-
-    return 'Unable to load damages right now.';
+    return apiErrorMessage(error, 'Unable to load damages right now.');
   }
 }

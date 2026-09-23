@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject } from '@angular/core';
-import { Observable, finalize, of, tap } from 'rxjs';
+import { Observable, finalize, of, share, tap } from 'rxjs';
 
 import { API_BASE_URL } from '../api.base-url';
 import { AuthenticatedUser, AuthSessionStore } from './auth-session.store';
@@ -20,20 +20,49 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly session = inject(AuthSessionStore);
 
+  /**
+   * One silent refresh at a time. Page boot and every 401 handler share this
+   * exchange so a hard reload never causes two requests that race the server's
+   * refresh-token rotation (the loser would 401 and appear to sign us out).
+   */
+  private refreshInFlight: Observable<LoginResponse | null> | null = null;
+
   readonly currentUser = this.session.user;
   readonly isAuthenticated = computed(() => this.session.token() !== null);
 
-  // Silent refresh uses httpOnly cookie; withCredentials ensures cookie is sent
-  tryRefresh(): Observable<LoginResponse | null> {
-    if (!this.session.hasRefreshCookie()) return of(null);
-    return this.http
-      .post<LoginResponse>(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+  /**
+   * Silent refresh via the httpOnly cookie (withCredentials ensures the cookie
+   * is sent). `force` bypasses the heuristic that skips the call when no local
+   * user is present — the 401 handler uses it because a cookie may exist even
+   * when memory was wiped by a reload.
+   */
+  tryRefresh(force = false): Observable<LoginResponse | null> {
+    if (this.refreshInFlight !== null) {
+      return this.refreshInFlight;
+    }
+
+    if (!force && !this.session.hasRefreshCookie()) {
+      return of(null);
+    }
+
+    const body: Record<string, string> = {};
+    const rt = this.session.refreshToken();
+    if (rt) body['refresh_token'] = rt;
+
+    this.refreshInFlight = this.http
+      .post<LoginResponse>(`${API_BASE_URL}/auth/refresh`, body, { withCredentials: true })
       .pipe(
         tap((response) => {
           this.session.setToken(response.access_token);
           if (response.refresh_token) this.session.setRefreshToken(response.refresh_token);
         }),
+        finalize(() => (this.refreshInFlight = null)),
+        // Multicast so every concurrent 401 handler subscribes to the SAME exchange.
+        // Without this each subscriber would re-fire its own POST.
+        share(),
       );
+
+    return this.refreshInFlight;
   }
 
   login(email: string, password: string): Observable<LoginResponse> {

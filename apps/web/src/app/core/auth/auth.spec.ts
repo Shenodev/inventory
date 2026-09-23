@@ -96,7 +96,27 @@ describe('authInterceptor', () => {
     controller.verify();
   });
 
-  it('clears the session and returns to /login when a 401 arrives without a refresh token', () => {
+  it('clears the session and returns to /login when a 401 arrives with no refresh possibility', () => {
+    const { http, controller, session } = setupInterceptors();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    session.setToken('stale-token');
+
+    http.get('/api/dashboard').subscribe({ error: () => undefined });
+    controller
+      .expectOne('/api/dashboard')
+      .flush({ message: 'Unauthenticated.' }, { status: 401, statusText: 'Unauthorized' });
+
+    expect(session.token()).toBeNull();
+    expect(session.refreshToken()).toBeNull();
+    expect(session.user()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { session: 'expired' },
+    });
+
+    controller.verify();
+  });
+
+  it('probes the httpOnly refresh cookie after a reload and signs out only if that fails', () => {
     const { http, controller, session } = setupInterceptors();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     session.setToken('stale-token');
@@ -106,6 +126,16 @@ describe('authInterceptor', () => {
     controller
       .expectOne('/api/dashboard')
       .flush({ message: 'Unauthenticated.' }, { status: 401, statusText: 'Unauthorized' });
+
+    // No in-memory refresh token after a reload, but a user was persisted so a
+    // cookie may exist — the interceptor must probe /auth/refresh (cookie path)
+    // instead of immediately killing the session.
+    const refreshRequest = controller.expectOne(REFRESH_URL);
+    expect(refreshRequest.request.body).toEqual({});
+    refreshRequest.flush(
+      { message: 'The refresh token is invalid.' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
 
     expect(session.token()).toBeNull();
     expect(session.refreshToken()).toBeNull();

@@ -19,6 +19,7 @@ import {
 import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatDate, formatNumber } from '../../core/format';
+import { apiErrorMessage } from '../../core/api-error';
 import { Product, ProductsService } from '../../core/products/products.service';
 import {
   PurchaseOrder,
@@ -1099,22 +1100,12 @@ export default class PurchaseOrdersPage {
   }
 
   private messageFor(error: unknown, fallback: string): string {
-    if (error instanceof HttpErrorResponse) {
-      if (error.status === 409 || error.status === 422) {
-        const body = error.error as { message?: string; errors?: Record<string, string[]> } | null;
-        const first = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
-        return first ?? body?.message ?? fallback;
-      }
-
-      if (error.status === 401) {
-        return 'Your session expired. Please sign in again.';
-      }
-
-      if (error.status === 0) {
-        return 'Cannot reach the server. Please try again.';
-      }
+    if (error instanceof HttpErrorResponse && (error.status === 409 || error.status === 422)) {
+      const body = error.error as { message?: string; errors?: Record<string, string[]> } | null;
+      const first = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+      return first ?? body?.message ?? fallback;
     }
 
-    return fallback;
+    return apiErrorMessage(error, fallback);
   }
 }

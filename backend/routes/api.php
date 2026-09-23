@@ -88,6 +88,8 @@ Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(f
     // Admin-only: user management and audit
     Route::prefix('admin')->middleware('role:admin')->group(function (): void {
         Route::get('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
+        Route::post('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'store']);
+        Route::patch('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'update']);
         Route::patch('/users/{user}/role', [\App\Http\Controllers\Api\Admin\UserController::class, 'updateRole']);
         Route::get('/audit', [\App\Http\Controllers\Api\Admin\AuditController::class, 'index']);
     });

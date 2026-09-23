@@ -19,6 +19,7 @@ import {
 import { RouteMeta } from '@analogjs/router';
 
 import { formatCurrency, formatNumber } from '../../core/format';
+import { apiErrorMessage } from '../../core/api-error';
 import { Product, ProductsService } from '../../core/products/products.service';
 import { BarcodeScannerComponent } from '../../shared/barcode-scanner.component';
 
@@ -1095,22 +1096,12 @@ export default class ProductsPage {
   }
 
   private messageFor(error: unknown, fallback: string): string {
-    if (error instanceof HttpErrorResponse) {
-      if (error.status === 422) {
-        const errors = (error.error as { errors?: Record<string, string[]> } | null)?.errors;
-        const first = errors ? Object.values(errors)[0]?.[0] : undefined;
-        return first ?? fallback;
-      }
-
-      if (error.status === 401) {
-        return 'Your session expired. Please sign in again.';
-      }
-
-      if (error.status === 0) {
-        return 'Cannot reach the server. Please try again.';
-      }
+    if (error instanceof HttpErrorResponse && error.status === 422) {
+      const errors = (error.error as { errors?: Record<string, string[]> } | null)?.errors;
+      const first = errors ? Object.values(errors)[0]?.[0] : undefined;
+      return first ?? fallback;
     }
 
-    return fallback;
+    return apiErrorMessage(error, fallback);
   }
 }

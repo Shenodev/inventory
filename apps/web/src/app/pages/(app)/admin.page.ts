@@ -11,26 +11,34 @@ import {
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouteMeta } from '@analogjs/router';
 
-import { formatDate, formatNumber } from '../../core/format';
+import { formatDate } from '../../core/format';
+import { AdminUsersService, AdminUser } from '../../core/admin/users.service';
+import { ALL_ROLES } from '../../core/auth/roles';
+import { AuthSessionStore } from '../../core/auth/auth-session.store';
+import { roleGuard } from '../../core/auth/role.guard';
+import { ToastService } from '../../core/ui/toast.service';
 import { apiErrorMessage } from '../../core/api-error';
-import { Customer, CustomersService } from '../../core/sales/customers.service';
 
 export const routeMeta: RouteMeta = {
-  title: 'Customers · ShenoInventory',
+  title: 'Users & Roles · ShenoInventory',
+  canActivate: [roleGuard],
+  data: { roles: ['admin'] },
 };
 
-const PAGE_SIZE = 50;
+interface EditorState {
+  user: AdminUser | null;
+}
 
 @Component({
-  selector: 'app-customers-page',
+  selector: 'app-admin-page',
   imports: [ReactiveFormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-heading text-2xl font-semibold text-white">Customers</h1>
+        <h1 class="font-heading text-2xl font-semibold text-white">Users & Roles</h1>
         <p class="mt-1 text-sm text-slate-400">
-          {{ customers().length }} customers in your book.
+          {{ users().length }} account{{ users().length === 1 ? '' : 's' }} across the workspace.
         </p>
       </div>
       <div class="flex gap-3">
@@ -47,7 +55,7 @@ const PAGE_SIZE = 50;
           (click)="openCreate()"
           class="rounded-xl bg-electric-cyan px-4 py-2 text-sm font-medium text-deep-slate transition-colors hover:bg-cyan-400"
         >
-          New customer
+          New user
         </button>
       </div>
     </header>
@@ -83,30 +91,6 @@ const PAGE_SIZE = 50;
       </div>
     }
 
-    <section class="mt-6 grid gap-6 sm:grid-cols-3">
-      <article class="rounded-xl bg-surface p-6">
-        <p class="text-sm font-medium text-slate-400">Customers on file</p>
-        <p class="mt-2 font-heading text-2xl font-semibold text-white">
-          {{ formatNumber(customers().length) }}
-        </p>
-        <p class="mt-1 text-xs text-slate-500">In your directory</p>
-      </article>
-      <article class="rounded-xl bg-surface p-6">
-        <p class="text-sm font-medium text-slate-400">Sales orders placed</p>
-        <p class="mt-2 font-heading text-2xl font-semibold text-electric-cyan">
-          {{ formatNumber(totalOrders()) }}
-        </p>
-        <p class="mt-1 text-xs text-slate-500">Across all customers</p>
-      </article>
-      <article class="rounded-xl bg-surface p-6">
-        <p class="text-sm font-medium text-slate-400">Have ordered</p>
-        <p class="mt-2 font-heading text-2xl font-semibold">
-          {{ formatNumber(activeCustomers()) }}
-        </p>
-        <p class="mt-1 text-xs text-slate-500">Customers with an order</p>
-      </article>
-    </section>
-
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <label class="relative flex min-w-0 flex-1 items-center">
         <svg
@@ -121,7 +105,7 @@ const PAGE_SIZE = 50;
         </svg>
         <input
           type="search"
-          placeholder="Search by name, email or phone…"
+          placeholder="Search by name, email or role…"
           [value]="query()"
           (input)="onQuery($event)"
           class="w-full rounded-xl border border-white/10 bg-surface py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
@@ -149,37 +133,50 @@ const PAGE_SIZE = 50;
             class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
           >
             <tr>
-              <th scope="col" class="px-6 py-3 font-medium">Customer</th>
-              <th scope="col" class="px-6 py-3 font-medium">Contact</th>
-              <th scope="col" class="px-6 py-3 text-center font-medium">Orders</th>
+              <th scope="col" class="px-6 py-3 font-medium">User</th>
+              <th scope="col" class="px-6 py-3 font-medium">Role</th>
               <th scope="col" class="px-6 py-3 font-medium">Added</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
-            @for (customer of visibleCustomers(); track customer.id) {
+            @for (user of visibleUsers(); track user.id) {
               <tr class="transition-colors hover:bg-deep-slate/60">
                 <td class="px-6 py-4">
-                  <p class="font-medium text-white">{{ customer.name }}</p>
-                  <p class="mt-0.5 text-xs text-slate-500">#{{ customer.id }}</p>
+                  <p class="font-medium text-white">
+                    {{ user.name }}
+                    @if (user.id === currentUserId()) {
+                      <span class="ml-1.5 rounded-full border border-white/10 bg-deep-slate px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">You</span>
+                    }
+                  </p>
+                  <p class="mt-0.5 text-xs text-slate-500">{{ user.email }}</p>
                 </td>
                 <td class="px-6 py-4">
-                  <p class="text-slate-300">{{ customer.email || '—' }}</p>
-                  <p class="mt-0.5 text-xs text-slate-500">{{ customer.phone || 'No phone on file' }}</p>
-                </td>
-                <td class="px-6 py-4 text-center">
-                  <span
-                    class="inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium"
-                    [class]="
-                      customer.sales_order_count > 0
-                        ? 'border-electric-cyan/30 bg-electric-cyan/10 text-electric-cyan'
-                        : 'border-white/10 bg-deep-slate text-slate-400'
-                    "
+                  <select
+                    [value]="user.role"
+                    [disabled]="user.id === currentUserId() || roleSaving() !== null"
+                    (change)="onRoleChange($event, user)"
+                    aria-label="Change role for {{ user.name }}"
+                    class="rounded-xl border border-white/10 bg-deep-slate px-3 py-1.5 text-sm font-medium text-slate-200 outline-none focus:border-electric-cyan disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {{ customer.sales_order_count }}
-                  </span>
+                    @for (role of allRoles; track role) {
+                      <option [value]="role">{{ roleLabel(role) }}</option>
+                    }
+                  </select>
                 </td>
                 <td class="px-6 py-4 text-sm text-slate-400">
-                  {{ formatDate(customer.created_at) }}
+                  {{ formatDate(user.created_at) }}
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      (click)="openEdit(user)"
+                      class="rounded-xl border border-white/10 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </td>
               </tr>
             } @empty {
@@ -194,19 +191,19 @@ const PAGE_SIZE = 50;
       </div>
     </section>
 
-    @if (filteredCustomers().length > visibleCustomers().length) {
+    @if (filteredUsers().length > visibleUsers().length) {
       <div class="mt-4 flex justify-center">
         <button
           type="button"
           (click)="showMore()"
           class="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-surface hover:text-white"
         >
-          Show more ({{ filteredCustomers().length - visibleCustomers().length }} remaining)
+          Show more ({{ filteredUsers().length - visibleUsers().length }} remaining)
         </button>
       </div>
     }
 
-    @if (editor()) {
+    @if (editor(); as state) {
       <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
         (click)="closeEditor()"
@@ -215,15 +212,21 @@ const PAGE_SIZE = 50;
           class="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6 text-left"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="customer-editor-title"
+          aria-labelledby="user-editor-title"
           (click)="$event.stopPropagation()"
         >
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h2 id="customer-editor-title" class="font-heading text-lg font-semibold text-white">
-                New customer
+              <h2 id="user-editor-title" class="font-heading text-lg font-semibold text-white">
+                {{ state.user === null ? 'New user' : 'Edit user' }}
               </h2>
-              <p class="mt-1 text-sm text-slate-400">Add a buyer to your customer directory.</p>
+              <p class="mt-1 text-sm text-slate-400">
+                {{
+                  state.user === null
+                    ? 'Create an account and choose its role.'
+                    : state.user.email
+                }}
+              </p>
             </div>
             <button
               type="button"
@@ -238,45 +241,63 @@ const PAGE_SIZE = 50;
           </div>
 
           <form class="mt-5" [formGroup]="form" (ngSubmit)="submitEditor()">
-            <label class="block text-sm font-medium text-slate-300" for="customer-name">
-              Name
+            <label class="block text-sm font-medium text-slate-300" for="user-name">
+              Full name
             </label>
             <input
-              id="customer-name"
+              id="user-name"
               type="text"
               formControlName="name"
-              placeholder="e.g. Jane Cooper"
+              placeholder="e.g. Priit Kaasik"
               class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
             />
 
-            <label class="mt-4 block text-sm font-medium text-slate-300" for="customer-email">
-              Email <span class="text-slate-500">(optional)</span>
+            <label class="mt-4 block text-sm font-medium text-slate-300" for="user-email">
+              Email
             </label>
             <input
-              id="customer-email"
+              id="user-email"
               type="email"
               formControlName="email"
-              placeholder="jane@company.com"
+              placeholder="name@shenodev.tech"
               class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
             />
 
-            <label class="mt-4 block text-sm font-medium text-slate-300" for="customer-phone">
-              Phone <span class="text-slate-500">(optional)</span>
+            <label class="mt-4 block text-sm font-medium text-slate-300" for="user-role">
+              Role
+            </label>
+            <select
+              id="user-role"
+              formControlName="role"
+              [disabled]="state.user !== null && state.user.id === currentUserId()"
+              class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none focus:border-electric-cyan disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              @for (role of allRoles; track role) {
+                <option [value]="role">{{ roleLabel(role) }} — {{ roleHint(role) }}</option>
+              }
+            </select>
+            @if (state.user !== null && state.user.id === currentUserId()) {
+              <p class="mt-1 text-xs text-slate-500">You cannot change your own role away from admin.</p>
+            }
+
+            <label class="mt-4 block text-sm font-medium text-slate-300" for="user-password">
+              Password
+              @if (state.user !== null) {
+                <span class="text-slate-500">(leave blank to keep current)</span>
+              }
             </label>
             <input
-              id="customer-phone"
-              type="text"
-              formControlName="phone"
-              placeholder="+1 (555) 010-2030"
+              id="user-password"
+              type="password"
+              formControlName="password"
+              autocomplete="new-password"
+              placeholder="At least 8 characters"
               class="mt-1 w-full rounded-xl border border-white/10 bg-deep-slate px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-electric-cyan"
             />
-
-            <label class="mt-4 flex items-start gap-2 text-xs leading-relaxed text-slate-400">
-              <input type="checkbox" formControlName="consent" class="mt-0.5 h-4 w-4 rounded border-white/20 bg-deep-slate text-cyan-500 focus:ring-cyan-400/30" />
-              <span>I have consent to store this contact and they are 16+ (see <a href="/legal/privacy" target="_blank" class="underline decoration-white/20 underline-offset-2 hover:text-white">Privacy</a>). Only name is required; email/phone are optional.</span>
-            </label>
-            @if (form.controls.consent.touched && form.controls.consent.invalid) {
-              <p class="mt-1 text-xs text-red-300">You must confirm consent.</p>
+            @if (state.user !== null) {
+              <p class="mt-1 text-xs text-slate-500">
+                Leave blank to keep the existing password.
+              </p>
             }
 
             @if (formError(); as message) {
@@ -302,7 +323,7 @@ const PAGE_SIZE = 50;
                 [disabled]="saving()"
                 class="flex-1 rounded-xl bg-electric-cyan px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {{ saving() ? 'Saving…' : 'Create customer' }}
+                {{ saving() ? 'Saving…' : state.user === null ? 'Create user' : 'Save changes' }}
               </button>
             </div>
           </form>
@@ -311,51 +332,50 @@ const PAGE_SIZE = 50;
     }
   `,
 })
-export default class CustomersPage {
-  private readonly customersService = inject(CustomersService);
-  private readonly formBuilder = inject(NonNullableFormBuilder);
+export default class AdminPage {
+  protected readonly allRoles = ALL_ROLES;
 
-  protected readonly customers = signal<Customer[]>([]);
+  private readonly usersService = inject(AdminUsersService);
+  private readonly formBuilder = inject(NonNullableFormBuilder);
+  private readonly session = inject(AuthSessionStore);
+  private readonly toaster = inject(ToastService);
+
+  protected readonly users = signal<AdminUser[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
   protected readonly query = signal('');
-  protected readonly limit = signal(PAGE_SIZE);
+  protected readonly limit = signal(50);
 
-  protected readonly editor = signal(false);
+  protected readonly editor = signal<EditorState | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal<string | null>(null);
+  protected readonly roleSaving = signal<number | null>(null);
 
   protected readonly form = this.formBuilder.group({
     name: this.formBuilder.control('', [Validators.required, Validators.maxLength(120)]),
-    email: this.formBuilder.control('', [Validators.email, Validators.maxLength(120)]),
-    phone: this.formBuilder.control('', [Validators.maxLength(30)]),
-    consent: this.formBuilder.control(false, [Validators.requiredTrue]),
+    email: this.formBuilder.control('', [Validators.required, Validators.email, Validators.maxLength(120)]),
+    role: this.formBuilder.control('operator', [Validators.required]),
+    password: this.formBuilder.control('', [Validators.minLength(8)]),
   });
 
-  protected readonly filteredCustomers = computed(() => {
+  protected readonly filteredUsers = computed(() => {
     const needle = this.query().trim().toLowerCase();
 
     if (needle === '') {
-      return this.customers();
+      return this.users();
     }
 
-    return this.customers().filter((customer) => {
-      const searchable = `${customer.name} ${customer.email} ${customer.phone}`.toLowerCase();
+    return this.users().filter((user) => {
+      const searchable = `${user.name} ${user.email} ${user.role}`.toLowerCase();
       return searchable.includes(needle);
     });
   });
 
-  protected readonly visibleCustomers = computed(() => this.filteredCustomers().slice(0, this.limit()));
+  protected readonly visibleUsers = computed(() => this.filteredUsers().slice(0, this.limit()));
 
-  protected readonly totalOrders = computed(() =>
-    this.customers().reduce((sum, customer) => sum + customer.sales_order_count, 0)
-  );
-
-  protected readonly activeCustomers = computed(
-    () => this.customers().filter((customer) => customer.sales_order_count > 0).length
-  );
+  protected readonly currentUserId = computed(() => this.session.user()?.id ?? -1);
 
   constructor() {
     afterNextRender(() => this.load());
@@ -370,60 +390,83 @@ export default class CustomersPage {
     this.loading.set(true);
     this.error.set(null);
 
-    this.customersService.list(force).subscribe({
-      next: ({ customers }) => {
-        this.customers.set(customers);
+    this.usersService.list(force).subscribe({
+      next: ({ users }) => {
+        this.users.set(users);
         this.loading.set(false);
       },
       error: (error: unknown) => {
         this.loading.set(false);
-        this.error.set(this.messageFor(error, 'Unable to load customers right now.'));
+        this.error.set(this.messageFor(error, 'Unable to load users right now.'));
       },
     });
   }
 
   protected onQuery(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);
-    this.limit.set(PAGE_SIZE);
+    this.limit.set(50);
   }
 
   protected clearQuery(): void {
     this.query.set('');
-    this.limit.set(PAGE_SIZE);
+    this.limit.set(50);
   }
 
   protected showMore(): void {
-    this.limit.update((current) => current + PAGE_SIZE);
+    this.limit.update((current) => current + 50);
   }
 
   protected resultLabel(): string {
     const needle = this.query().trim();
 
     if (needle === '') {
-      return `${this.customers().length} customer${this.customers().length === 1 ? '' : 's'}`;
+      return `${this.users().length} account${this.users().length === 1 ? '' : 's'}`;
     }
 
-    const count = this.filteredCustomers().length;
+    const count = this.filteredUsers().length;
 
     return `${count} match${count === 1 ? '' : 'es'} for "${needle}"`;
   }
 
   protected emptyLabel(): string {
     if (this.loading()) {
-      return 'Loading customers…';
+      return 'Loading users…';
     }
 
     if (this.query().trim() !== '') {
-      return 'No customers match your search.';
+      return 'No users match your search.';
     }
 
-    return 'No customers found yet.';
+    return 'No users found yet.';
+  }
+
+  protected roleLabel(role: string): string {
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  }
+
+  protected roleHint(role: string): string {
+    switch (role) {
+      case 'admin':
+        return 'Full access, incl. users & financials';
+      case 'manager':
+        return 'All operations & financials, no user management';
+      case 'operator':
+        return 'Day-to-day stock & order entry';
+      default:
+        return 'Read-only access';
+    }
   }
 
   protected openCreate(): void {
-    this.form.reset({ name: '', email: '', phone: '', consent: false });
+    this.form.reset({ name: '', email: '', role: 'operator', password: '' });
     this.formError.set(null);
-    this.editor.set(true);
+    this.editor.set({ user: null });
+  }
+
+  protected openEdit(user: AdminUser): void {
+    this.form.reset({ name: user.name, email: user.email, role: user.role, password: '' });
+    this.formError.set(null);
+    this.editor.set({ user });
   }
 
   protected closeEditor(): void {
@@ -431,59 +474,106 @@ export default class CustomersPage {
       return;
     }
 
-    this.editor.set(false);
+    this.editor.set(null);
   }
 
   protected submitEditor(): void {
-    if (this.saving()) {
+    const state = this.editor();
+
+    if (state === null || this.saving()) {
       return;
     }
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.formError.set('Please fix the highlighted fields.');
       return;
     }
 
-    const { name, email, phone } = this.form.getRawValue();
+    const { name, email, role, password } = this.form.getRawValue();
+
+    if (state.user === null && password.trim() === '') {
+      this.formError.set('A password of at least 8 characters is required for a new user.');
+      return;
+    }
+
     this.saving.set(true);
     this.formError.set(null);
 
-    this.customersService
-      .store({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null })
-      .subscribe({
-        next: ({ customer }) => {
-          this.saving.set(false);
-          this.editor.set(false);
-          this.upsert(customer);
-          this.notice.set(`Customer "${customer.name}" added.`);
-        },
-        error: (error: unknown) => {
-          this.saving.set(false);
-          this.formError.set(this.messageFor(error, 'Unable to create the customer right now.'));
-        },
-      });
+    const request =
+      state.user === null
+        ? this.usersService.create({
+            name: name.trim(),
+            email: email.trim(),
+            password,
+            role,
+          })
+        : this.usersService.update(state.user.id, {
+            name: name.trim(),
+            email: email.trim(),
+            role,
+            password: password.trim() === '' ? null : password,
+          });
+
+    request.subscribe({
+      next: ({ message, user }) => {
+        this.saving.set(false);
+        this.editor.set(null);
+        this.upsert(user);
+        this.notice.set(message);
+      },
+      error: (error: unknown) => {
+        this.saving.set(false);
+        this.formError.set(this.messageFor(error, 'Unable to save the user right now.'));
+      },
+    });
   }
 
-  protected formatNumber(value: number): string {
-    return formatNumber(value);
+  protected onRoleChange(event: Event, user: AdminUser): void {
+    const target = event.target as HTMLSelectElement;
+    const role = target.value;
+
+    if (role === user.role || this.roleSaving() !== null) {
+      return;
+    }
+
+    this.roleSaving.set(user.id);
+
+    this.usersService.updateRole(user.id, role).subscribe({
+      next: ({ message, user: updated }) => {
+        this.roleSaving.set(null);
+        this.replaceUser({ ...user, role: updated.role });
+        this.toaster.show(message);
+      },
+      error: (error: unknown) => {
+        this.roleSaving.set(null);
+        // Revert the <select> to the user's actual role on the server.
+        this.replaceUser({ ...user });
+        this.toaster.show(this.messageFor(error, 'Unable to change the role right now.'), 'error');
+      },
+    });
   }
 
   protected formatDate(value: string | null): string {
     return formatDate(value);
   }
 
-  private upsert(customer: Customer): void {
-    this.customers.update((list) => {
-      const index = list.findIndex((item) => item.id === customer.id);
+  private upsert(user: AdminUser): void {
+    this.users.update((list) => {
+      const index = list.findIndex((item) => item.id === user.id);
 
       if (index === -1) {
-        return [...list, customer].sort((a, b) => a.name.localeCompare(b.name));
+        return [...list, user].sort((a, b) => a.name.localeCompare(b.name));
       }
 
       const copy = [...list];
-      copy[index] = customer;
+      copy[index] = user;
       return copy;
     });
+  }
+
+  private replaceUser(user: AdminUser): void {
+    this.users.update((list) => list.map((item) => (item.id === user.id ? user : item)));
   }
 
   private messageFor(error: unknown, fallback: string): string {
