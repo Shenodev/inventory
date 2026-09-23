@@ -10,8 +10,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreDamageRequest;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\Transaction;
 use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -110,6 +112,78 @@ class DamageController extends Controller
                 'movement_id' => $result['movement']->id,
                 'transaction_id' => $result['transaction']->id,
             ],
+        ]);
+    }
+
+    /**
+     * Atomically reverse a damage write-off ("report not damaged"): restore the
+     * units to inventory, log an inbound movement that references the original
+     * damage, offset the recorded expense with a negative expense (keeps the
+     * financial audit trail intact) and remove the damage movement so it no
+     * longer appears in the damages list or damaged-quantity totals.
+     */
+    public function reverse(Request $request, StockMovement $movement): JsonResponse
+    {
+        if ($movement->type !== StockMovementType::Damage) {
+            throw ValidationException::withMessages([
+                'movement' => 'Only a damage write-off can be reversed.',
+            ]);
+        }
+
+        $result = DB::transaction(function () use ($movement): array {
+            $product = Product::query()
+                ->whereKey($movement->product_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $marker = "Reversed damage #{$movement->id}";
+
+            $alreadyReversed = StockMovement::query()
+                ->where('product_id', $product->id)
+                ->where('type', StockMovementType::In)
+                ->where('note', $marker)
+                ->exists();
+
+            if ($alreadyReversed) {
+                throw ValidationException::withMessages([
+                    'movement' => 'This damage report was already reversed.',
+                ]);
+            }
+
+            $product->total_stock += $movement->quantity;
+            $product->save();
+
+            $reversal = $product->stockMovements()->create([
+                'order_id' => null,
+                'type' => StockMovementType::In,
+                'quantity' => $movement->quantity,
+                'note' => $marker,
+            ]);
+
+            $restored = round((float) $product->cost * $movement->quantity, 2);
+
+            Transaction::create([
+                'type' => TransactionType::Expense,
+                'amount' => -$restored,
+                'reference_type' => 'DamageReversal',
+                'reference_id' => $reversal->id,
+            ]);
+
+            $movement->delete();
+
+            return [
+                'product' => $product,
+                'reversal' => $reversal,
+                'restored' => $restored,
+            ];
+        });
+
+        $this->inventory->evaluateLowStock($result['product']);
+
+        return response()->json([
+            'message' => "{$result['reversal']->quantity} units restored to {$result['product']->name}.",
+            'restored' => $result['restored'],
+            'product_id' => $result['product']->id,
         ]);
     }
 }

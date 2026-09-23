@@ -37,6 +37,8 @@ describe('DamagesPage', () => {
                   },
                 ],
               }),
+            reverseDamage: () =>
+              of({ message: '3 units restored to Fragile Widget.', restored: 24, product_id: 5 }),
           },
         },
       ],
@@ -54,5 +56,31 @@ describe('DamagesPage', () => {
     expect(text).toContain('Cracked during unload');
     expect(text).toContain('$24.00');
     expect(text).toContain('Sep 2, 2026');
+  });
+
+  it('reports a damage as not damaged, restores stock and removes the entry', () => {
+    const fixture = TestBed.createComponent(DamagesPage);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const buttons = Array.from(el.querySelectorAll('button')) as HTMLButtonElement[];
+    const notDamaged = buttons.find((button) => button.textContent?.trim() === 'Not damaged');
+    expect(notDamaged).toBeDefined();
+
+    notDamaged?.click();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Report Fragile Widget not damaged?');
+
+    const restore = Array.from(el.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Restore stock'
+    );
+    expect(restore).toBeDefined();
+
+    restore?.click();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('3 units restored to Fragile Widget.');
+    expect(el.textContent).not.toContain('Cracked during unload');
   });
 });

@@ -205,7 +205,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
     </div>
 
     <section class="mt-4 overflow-hidden rounded-xl bg-surface">
-      <div class="max-h-[70vh] overflow-y-auto">
+      <div class="max-h-[70vh] overflow-x-auto overflow-y-auto">
         <table class="w-full text-left text-sm">
           <thead
             class="sticky top-0 z-10 border-b border-white/5 bg-surface text-xs uppercase tracking-wide text-slate-500"
@@ -255,7 +255,7 @@ type StockStatus = 'in-stock' | 'low-stock' | 'out-of-stock';
                 </td>
                 <td class="px-6 py-4">
                   <span
-                    class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+                    class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold"
                     [class]="statusChipClass(statusOf(product))"
                   >
                     {{ statusLabel(statusOf(product)) }}

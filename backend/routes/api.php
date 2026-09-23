@@ -78,6 +78,7 @@ Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(f
 
     Route::get('/damages', [DamageController::class, 'index']);
     Route::post('/damages', [DamageController::class, 'store'])->middleware('role:manager,admin');
+    Route::post('/damages/{movement}/reverse', [DamageController::class, 'reverse'])->middleware('role:manager,admin');
 
     // Financials — admin/manager only (RLS + sensitivity)
     Route::middleware('role:manager,admin')->group(function (): void {

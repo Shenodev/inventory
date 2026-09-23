@@ -112,6 +112,13 @@ export class ProductsService {
     return this.http.post<ReportDamageResponse>(`${API_BASE_URL}/damages`, payload);
   }
 
+  reverseDamage(movementId: number): Observable<{ message: string; restored: number; product_id: number }> {
+    return this.http.post<{ message: string; restored: number; product_id: number }>(
+      `${API_BASE_URL}/damages/${movementId}/reverse`,
+      {}
+    );
+  }
+
   listDamages(force = false): Observable<DamagesResponse> {
     return this.http.get<DamagesResponse>(`${API_BASE_URL}/damages`, {
       context: new HttpContext().set(BYPASS_CACHE, force),

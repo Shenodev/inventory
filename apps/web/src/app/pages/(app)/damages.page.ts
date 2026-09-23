@@ -1,6 +1,8 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
+  HostListener,
   afterNextRender,
   computed,
   inject,
@@ -46,6 +48,22 @@ export const routeMeta: RouteMeta = {
           class="shrink-0 rounded-xl bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500"
         >
           Retry
+        </button>
+      </div>
+    }
+
+    @if (notice(); as message) {
+      <div
+        class="mt-6 flex items-center justify-between gap-4 rounded-xl border border-electric-cyan/30 bg-electric-cyan/10 px-5 py-4"
+        role="status"
+      >
+        <p class="text-sm text-slate-200">{{ message }}</p>
+        <button
+          type="button"
+          (click)="notice.set(null)"
+          class="shrink-0 text-sm font-medium text-electric-cyan transition-colors hover:text-cyan-200"
+        >
+          Dismiss
         </button>
       </div>
     }
@@ -111,6 +129,7 @@ export const routeMeta: RouteMeta = {
               <th scope="col" class="px-6 py-3 font-medium">Reason</th>
               <th scope="col" class="px-6 py-3 text-right font-medium">Loss</th>
               <th scope="col" class="px-6 py-3 font-medium">Date</th>
+              <th scope="col" class="px-6 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5">
@@ -124,10 +143,19 @@ export const routeMeta: RouteMeta = {
                 <td class="px-6 py-4 text-slate-300">{{ entry.reason ?? 'Not specified' }}</td>
                 <td class="px-6 py-4 text-right font-medium text-red-300">{{ formatCurrency(entry.loss) }}</td>
                 <td class="px-6 py-4 text-slate-300">{{ formatDate(entry.created_at ?? null) }}</td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    type="button"
+                    (click)="requestReverse(entry)"
+                    class="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-electric-cyan/40 hover:text-electric-cyan"
+                  >
+                    Not damaged
+                  </button>
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="5" class="px-6 py-10 text-center text-slate-500">
+                <td colspan="6" class="px-6 py-10 text-center text-slate-500">
                   {{ loading() ? 'Loading damages…' : (query() || dateFrom() || dateTo() ? 'No damages match your filters.' : 'No damages written off yet.') }}
                 </td>
               </tr>
@@ -136,6 +164,55 @@ export const routeMeta: RouteMeta = {
         </table>
       </div>
     </section>
+
+    @if (reverseTarget(); as entry) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-deep-slate/80 px-4 py-8 backdrop-blur-sm"
+        (click)="cancelReverse()"
+      >
+        <div
+          class="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6 text-left"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="reverse-damage-title"
+          (click)="$event.stopPropagation()"
+        >
+          <h2 id="reverse-damage-title" class="font-heading text-lg font-semibold text-white">
+            Report {{ entry.name }} not damaged?
+          </h2>
+          <p class="mt-2 text-sm text-slate-400">
+            Restores {{ formatNumber(entry.quantity) }} unit{{ entry.quantity === 1 ? '' : 's' }} to
+            stock and reverses the {{ formatCurrency(entry.loss) }} write-off.
+          </p>
+          @if (reverseError(); as message) {
+            <p
+              class="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+              role="alert"
+            >
+              {{ message }}
+            </p>
+          }
+          <div class="mt-6 flex gap-3">
+            <button
+              type="button"
+              (click)="cancelReverse()"
+              [disabled]="reversing()"
+              class="flex-1 rounded-xl border border-white/10 px-4 py-3 font-medium text-slate-300 transition-colors hover:bg-deep-slate hover:text-white disabled:opacity-60"
+            >
+              Keep damaged
+            </button>
+            <button
+              type="button"
+              (click)="confirmReverse()"
+              [disabled]="reversing()"
+              class="flex-1 rounded-xl bg-electric-cyan px-4 py-3 font-medium text-deep-slate transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ reversing() ? 'Restoring…' : 'Restore stock' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export default class DamagesPage {
@@ -144,6 +221,11 @@ export default class DamagesPage {
   protected readonly damages = signal<DamageEntry[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly notice = signal<string | null>(null);
+
+  protected readonly reverseTarget = signal<DamageEntry | null>(null);
+  protected readonly reversing = signal(false);
+  protected readonly reverseError = signal<string | null>(null);
 
   protected readonly query = signal('');
   protected readonly dateFrom = signal('');
@@ -185,6 +267,11 @@ export default class DamagesPage {
     afterNextRender(() => this.load());
   }
 
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    this.cancelReverse();
+  }
+
   protected onQuery(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);
   }
@@ -215,6 +302,43 @@ export default class DamagesPage {
     });
   }
 
+  protected requestReverse(entry: DamageEntry): void {
+    this.reverseError.set(null);
+    this.reverseTarget.set(entry);
+  }
+
+  protected cancelReverse(): void {
+    if (this.reversing()) {
+      return;
+    }
+
+    this.reverseTarget.set(null);
+  }
+
+  protected confirmReverse(): void {
+    const entry = this.reverseTarget();
+
+    if (entry === null || this.reversing() || entry.id === undefined) {
+      return;
+    }
+
+    this.reversing.set(true);
+    this.reverseError.set(null);
+
+    this.productsService.reverseDamage(entry.id).subscribe({
+      next: ({ message }) => {
+        this.reversing.set(false);
+        this.reverseTarget.set(null);
+        this.damages.update((list) => list.filter((item) => item.id !== entry.id));
+        this.notice.set(message);
+      },
+      error: (error: unknown) => {
+        this.reversing.set(false);
+        this.reverseError.set(this.messageFor(error));
+      },
+    });
+  }
+
   protected formatNumber(value: number): string {
     return formatNumber(value);
   }
@@ -228,6 +352,12 @@ export default class DamagesPage {
   }
 
   private messageFor(error: unknown): string {
+    if (error instanceof HttpErrorResponse && (error.status === 409 || error.status === 422)) {
+      const body = error.error as { message?: string; errors?: Record<string, string[]> } | null;
+      const first = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+      return first ?? body?.message ?? 'Unable to update damages right now.';
+    }
+
     return apiErrorMessage(error, 'Unable to load damages right now.');
   }
 }
