@@ -11,3 +11,5 @@ dist/
 website.md
 brag-*
 portfolio
+.vercel
+.env*

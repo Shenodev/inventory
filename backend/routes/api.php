@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\Admin\AuditController;
+use App\Http\Controllers\Api\Admin\UserController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DamageController;
 use App\Http\Controllers\Api\DashboardController;
@@ -27,7 +29,7 @@ Route::match(['get', 'post'], '/unsubscribe', [AccountController::class, 'unsubs
 // Webhooks — always signature-verified, rate-limited
 Route::post('/webhooks/inventory', [WebhookController::class, 'handle'])->middleware(['webhook.signature', 'throttle:api']);
 
-Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'abilities:access', 'cache.reads', 'throttle:api'])->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'me']);
 
@@ -89,11 +91,11 @@ Route::middleware(['auth:sanctum', 'abilities:access', 'throttle:api'])->group(f
 
     // Admin-only: user management and audit
     Route::prefix('admin')->middleware('role:admin')->group(function (): void {
-        Route::get('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
-        Route::post('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'store']);
-        Route::patch('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'update']);
-        Route::delete('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'destroy']);
-        Route::patch('/users/{user}/role', [\App\Http\Controllers\Api\Admin\UserController::class, 'updateRole']);
-        Route::get('/audit', [\App\Http\Controllers\Api\Admin\AuditController::class, 'index']);
+        Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::patch('/users/{user}', [UserController::class, 'update']);
+        Route::delete('/users/{user}', [UserController::class, 'destroy']);
+        Route::patch('/users/{user}/role', [UserController::class, 'updateRole']);
+        Route::get('/audit', [AuditController::class, 'index']);
     });
 });

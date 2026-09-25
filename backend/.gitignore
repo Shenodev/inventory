@@ -17,3 +17,6 @@ Homestead.yaml
 /.nova
 /.vscode
 /.zed
+
+.vercel
+.env*
