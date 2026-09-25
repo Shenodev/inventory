@@ -13,7 +13,18 @@ export default defineConfig(({ mode }) => ({
     mainFields: ['module'],
   },
   plugins: [
-    analog(),
+    analog({
+      nitro: {
+        routeRules: {
+          '/assets/**': {
+            headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+          },
+          '/**': {
+            headers: { 'Cache-Control': 'private, no-store' },
+          },
+        },
+      },
+    }),
     tailwindcss()
   ],
   test: {
