@@ -10,3 +10,4 @@ backend/storage/logs
 .vercel
 .angular
 **/dist
+**/node_modules
